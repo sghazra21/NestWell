@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   UserRole,
+  UserProfile,
   ResidentProfile,
   Visitor,
   Complaint,
@@ -13,6 +14,11 @@ import {
   ComplaintCategory,
   ComplaintPriority,
   ComplaintStatus,
+  Election,
+  Nomination,
+  Vote,
+  CommitteeMember,
+  ElectionPosition,
 } from '../types';
 import {
   INITIAL_SOCIETY,
@@ -24,13 +30,61 @@ import {
   INITIAL_FACILITIES,
   INITIAL_NOTICES,
   INITIAL_ACTIVITIES,
+  INITIAL_ELECTIONS,
+  INITIAL_NOMINATIONS,
+  INITIAL_VOTES,
+  INITIAL_COMMITTEE_MEMBERS,
 } from '../mock/initialData';
+import {
+  auth,
+  onAuthStateChanged,
+  firebaseSignOut,
+  FirebaseUser,
+} from '../lib/firebase';
+import {
+  syncUserProfile,
+  updateUserProfile,
+  seedFirestoreInitialData,
+  subscribeVisitors,
+  createFirestoreVisitor,
+  updateFirestoreVisitorStatus,
+  subscribeComplaints,
+  createFirestoreComplaint,
+  updateFirestoreComplaint,
+  subscribeBills,
+  updateFirestoreBillPayment,
+  subscribeElections,
+  createFirestoreElection,
+  updateFirestoreElection,
+  subscribeNominations,
+  submitFirestoreNomination,
+  updateFirestoreNominationStatus,
+  subscribeVotes,
+  castFirestoreVote,
+  subscribeNotices,
+  createFirestoreNotice,
+} from '../lib/firestoreService';
 
 interface AppContextType {
   role: UserRole;
   setRole: (role: UserRole) => void;
+  user: FirebaseUser | null;
+  userProfile: UserProfile | null;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+  isProfileCompletionOpen: boolean;
+  setIsProfileCompletionOpen: (open: boolean) => void;
+  isElectionModalOpen: boolean;
+  setIsElectionModalOpen: (open: boolean) => void;
+  isPaymentsResearchOpen: boolean;
+  setIsPaymentsResearchOpen: (open: boolean) => void;
+  loginWithDemoAccount: (role: UserRole) => void;
+  completeUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  logout: () => Promise<void>;
+
   society: SocietyInfo;
   resident: ResidentProfile;
+  setResident: React.Dispatch<React.SetStateAction<ResidentProfile>>;
   residents: ResidentProfile[];
   addResident: (resident: Partial<ResidentProfile>) => void;
   visitors: Visitor[];
@@ -72,6 +126,28 @@ interface AppContextType {
     attachmentName?: string;
   }) => Notice;
   activities: ActivityEvent[];
+
+  // Elections, Nominations & Governance
+  elections: Election[];
+  nominations: Nomination[];
+  votes: Vote[];
+  committeeMembers: CommitteeMember[];
+  castVote: (data: {
+    electionId: string;
+    position: ElectionPosition;
+    candidateId: string;
+    voterId: string;
+    voterFlat: string;
+  }) => Promise<void>;
+  submitNomination: (
+    data: Omit<Nomination, 'id' | 'status' | 'voteCount' | 'nominatedAt'>
+  ) => Promise<void>;
+  updateNominationStatus: (id: string, status: Nomination['status']) => Promise<void>;
+  createElection: (
+    data: Omit<Election, 'id' | 'totalVotesCast' | 'createdAt'>
+  ) => Promise<void>;
+  updateElectionStatus: (id: string, status: Election['status']) => Promise<void>;
+
   // Gate simulation states
   gateAlert: {
     active: boolean;
@@ -80,7 +156,6 @@ interface AppContextType {
   };
   triggerGateSimulation: () => void;
   dismissGateAlert: () => void;
-  // Device Frame toggle for desktop users testing mobile UI
   previewMode: 'auto' | 'mobile_frame';
   setPreviewMode: (mode: 'auto' | 'mobile_frame') => void;
   toastMessage: string | null;
@@ -91,6 +166,29 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Auth state
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    return {
+      id: 'res-sayan-b402',
+      email: 'sayan.ghosh@greenwood.in',
+      name: 'Sayan Ghosh',
+      role: 'resident',
+      phone: '+91 98765 43210',
+      flat: 'B-402',
+      tower: 'Tower B',
+      type: 'Owner',
+      isProfileComplete: true,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString(),
+    };
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
+  const [isElectionModalOpen, setIsElectionModalOpen] = useState(false);
+  const [isPaymentsResearchOpen, setIsPaymentsResearchOpen] = useState(false);
+
   const [role, setRoleState] = useState<UserRole>(() => {
     return (localStorage.getItem('nestwell_role') as UserRole) || 'resident';
   });
@@ -139,7 +237,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
   });
 
-  // Initial gate alert state: Rahul waiting at the gate
+  // Elections & Governance state
+  const [elections, setElections] = useState<Election[]>(INITIAL_ELECTIONS);
+  const [nominations, setNominations] = useState<Nomination[]>(INITIAL_NOMINATIONS);
+  const [votes, setVotes] = useState<Vote[]>(INITIAL_VOTES);
+  const [committeeMembers] = useState<CommitteeMember[]>(INITIAL_COMMITTEE_MEMBERS);
+
+  // Initial gate alert state
   const [gateAlert, setGateAlert] = useState<{
     active: boolean;
     visitor?: Visitor;
@@ -163,7 +267,182 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setRole = (newRole: UserRole) => {
     setRoleState(newRole);
     localStorage.setItem('nestwell_role', newRole);
-    showToast(`Switched interface to ${newRole.charAt(0).toUpperCase() + newRole.slice(1)} mode`);
+    showToast(`Switched interface to ${newRole.charAt(0).toUpperCase() + newRole.slice(1)} view`);
+  };
+
+  // Connect Firebase Auth & Firestore live sync on mount
+  useEffect(() => {
+    // 1. Seed Firestore if fresh
+    seedFirestoreInitialData();
+
+    // 2. Listen to Auth State
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      setUser(fbUser);
+      if (fbUser) {
+        try {
+          const profile = await syncUserProfile(fbUser, role);
+          setUserProfile(profile);
+          if (profile.role) {
+            setRoleState(profile.role);
+          }
+          if (profile.flat) {
+            setResident((prev) => ({
+              ...prev,
+              name: profile.name || prev.name,
+              flat: profile.flat || prev.flat,
+              tower: profile.tower || prev.tower,
+              phone: profile.phone || prev.phone,
+              email: profile.email || prev.email,
+            }));
+          }
+          // If profile is incomplete, trigger mandatory profile completion modal!
+          if (!profile.isProfileComplete) {
+            setIsProfileCompletionOpen(true);
+          }
+        } catch (e) {
+          console.warn('Could not sync user profile:', e);
+        }
+      }
+    });
+
+    // 3. Setup real-time Firestore listeners
+    const unsubVisitors = subscribeVisitors((vList) => {
+      if (vList.length > 0) setVisitors(vList);
+    });
+
+    const unsubComplaints = subscribeComplaints((cList) => {
+      if (cList.length > 0) setComplaints(cList);
+    });
+
+    const unsubBills = subscribeBills((bList) => {
+      if (bList.length > 0) setBills(bList);
+    });
+
+    const unsubElections = subscribeElections((eList) => {
+      if (eList.length > 0) setElections(eList);
+    });
+
+    const unsubNominations = subscribeNominations((nList) => {
+      if (nList.length > 0) setNominations(nList);
+    });
+
+    const unsubVotes = subscribeVotes('elec-2026', (vList) => {
+      if (vList.length > 0) setVotes(vList);
+    });
+
+    const unsubNotices = subscribeNotices((notifList) => {
+      if (notifList.length > 0) setNotices(notifList);
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubVisitors();
+      unsubComplaints();
+      unsubBills();
+      unsubElections();
+      unsubNominations();
+      unsubVotes();
+      unsubNotices();
+    };
+  }, []);
+
+  // Quick Demo Account Switcher
+  const loginWithDemoAccount = (targetRole: UserRole) => {
+    let mockProfile: UserProfile;
+    if (targetRole === 'admin') {
+      mockProfile = {
+        id: 'admin-alok',
+        email: 'president@greenwood.in',
+        name: 'Dr. Alok Nath Mukherjee',
+        role: 'admin',
+        designation: 'RWA President',
+        phone: '+91 98311 88442',
+        flat: 'A-701',
+        tower: 'Tower A',
+        type: 'Owner',
+        isProfileComplete: true,
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString(),
+      };
+    } else if (targetRole === 'security') {
+      mockProfile = {
+        id: 'sec-ramesh',
+        email: 'guard.gate1@greenwood.in',
+        name: 'Havildar Ramesh Yadav',
+        role: 'security',
+        gateNumber: 'Gate 1 - Main Entrance',
+        badgeId: 'SEC-042',
+        phone: '+91 98111 22334',
+        isProfileComplete: true,
+        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString(),
+      };
+    } else {
+      mockProfile = {
+        id: 'res-sayan-b402',
+        email: 'sayan.ghosh@greenwood.in',
+        name: 'Sayan Ghosh',
+        role: 'resident',
+        phone: '+91 98765 43210',
+        flat: 'B-402',
+        tower: 'Tower B',
+        type: 'Owner',
+        isProfileComplete: true,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    setUserProfile(mockProfile);
+    setRole(targetRole);
+    if (mockProfile.flat) {
+      setResident((prev) => ({
+        ...prev,
+        name: mockProfile.name,
+        flat: mockProfile.flat || prev.flat,
+        tower: mockProfile.tower || prev.tower,
+        phone: mockProfile.phone || prev.phone,
+        email: mockProfile.email,
+        avatar: mockProfile.avatar,
+      }));
+    }
+  };
+
+  const completeUserProfileHandler = async (updates: Partial<UserProfile>) => {
+    if (!userProfile) return;
+    const updated: UserProfile = {
+      ...userProfile,
+      ...updates,
+      isProfileComplete: true,
+    };
+    setUserProfile(updated);
+    if (updated.role) {
+      setRoleState(updated.role);
+    }
+    if (updated.flat) {
+      setResident((prev) => ({
+        ...prev,
+        name: updated.name || prev.name,
+        flat: updated.flat || prev.flat,
+        tower: updated.tower || prev.tower,
+        phone: updated.phone || prev.phone,
+      }));
+    }
+    // Update in Firestore
+    if (user?.uid) {
+      await updateUserProfile(user.uid, updated);
+    }
+    setIsProfileCompletionOpen(false);
+  };
+
+  const logout = async () => {
+    try {
+      await firebaseSignOut(auth);
+      setUser(null);
+      showToast('Logged out of society account.');
+    } catch (e) {
+      console.warn('Logout error:', e);
+    }
   };
 
   // Persist whenever state changes
@@ -195,7 +474,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('nestwell_notices', JSON.stringify(notices));
   }, [notices]);
 
-  // Actions
+  useEffect(() => {
+    localStorage.setItem('nestwell_activities', JSON.stringify(activities));
+  }, [activities]);
+
+  // Visitor actions
   const inviteVisitor = (data: {
     name: string;
     phone: string;
@@ -205,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type?: Visitor['type'];
     company?: string;
   }) => {
-    const passCode = `PASS-${Math.floor(1000 + Math.random() * 9000)}`;
+    const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     const newVisitor: Visitor = {
       id: `vis-${Date.now()}`,
       name: data.name,
@@ -213,20 +496,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       flat: resident.flat,
       tower: resident.tower,
       residentName: resident.name,
-      purpose: data.purpose || 'Personal Guest',
+      purpose: data.purpose,
       type: data.type || 'Guest',
       company: data.company,
-      expectedDate: data.expectedDate || 'Today',
-      expectedTime: data.expectedTime || '12:00 PM',
-      passNumber: passCode,
-      qrCode: `GW-${resident.flat}-${passCode}`,
+      expectedDate: data.expectedDate,
+      expectedTime: data.expectedTime,
+      passNumber: `NW-${randomCode}`,
+      qrCode: `QR-NW-${randomCode}`,
       status: 'expected',
       gateNumber: 'Gate 1',
       createdAt: 'Just now',
     };
 
     setVisitors((prev) => [newVisitor, ...prev]);
-    showToast(`Visitor pass generated for ${data.name} (Code: ${passCode})`);
+
+    // Save to Firestore asynchronously
+    createFirestoreVisitor(newVisitor).catch((err) =>
+      console.warn('Firestore visitor save notice:', err)
+    );
+
+    // Record Activity
+    setActivities((prev) => [
+      {
+        id: `act-${Date.now()}`,
+        time: 'Just now',
+        title: `Pre-invited ${newVisitor.name} (${newVisitor.type})`,
+        flat: resident.flat,
+        type: 'visitor',
+        icon: 'UserCheck',
+      },
+      ...prev,
+    ]);
+
+    showToast(`Pass created for ${newVisitor.name}. QR code ready.`);
     return newVisitor;
   };
 
@@ -234,14 +536,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVisitors((prev) =>
       prev.map((v) => {
         if (v.id === id) {
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          return {
+          const updated = {
             ...v,
             status,
-            entryTime: status === 'inside' ? timeStr : v.entryTime,
-            exitTime: status === 'exited' ? timeStr : v.exitTime,
+            entryTime: status === 'inside' ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : v.entryTime,
+            exitTime: status === 'exited' ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : v.exitTime,
           };
+          updateFirestoreVisitorStatus(id, updated).catch((err) => console.warn(err));
+          return updated;
         }
         return v;
       })
@@ -250,32 +552,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const approveVisitor = (id: string) => {
     const visitor = visitors.find((v) => v.id === id);
-    const visitorName = visitor ? visitor.name : 'Visitor';
+    if (!visitor) return;
 
     updateVisitorStatus(id, 'inside');
     setGateAlert({ active: false });
 
-    // Add activity
-    const newAct: ActivityEvent = {
-      id: `act-${Date.now()}`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      title: `${visitorName} approved at Gate 1`,
-      flat: resident.flat,
-      type: 'visitor',
-      icon: 'UserCheck',
-    };
-    setActivities((prev) => [newAct, ...prev]);
+    // Confetti celebration
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.8 },
+    });
 
-    showToast(`${visitorName} has entered the society.`);
+    // Record Activity
+    setActivities((prev) => [
+      {
+        id: `act-${Date.now()}`,
+        time: 'Just now',
+        title: `Gate Entry Approved for ${visitor.name}`,
+        flat: visitor.flat,
+        type: 'visitor',
+        icon: 'UserCheck',
+      },
+      ...prev,
+    ]);
+
+    showToast(`Approved! Barrier gate opened for ${visitor.name}.`);
   };
 
   const rejectVisitor = (id: string) => {
     const visitor = visitors.find((v) => v.id === id);
-    const visitorName = visitor ? visitor.name : 'Visitor';
-
-    updateVisitorStatus(id, 'exited');
+    updateVisitorStatus(id, 'rejected' as any);
     setGateAlert({ active: false });
-    showToast(`Entry declined for ${visitorName}. Security informed.`);
+
+    setActivities((prev) => [
+      {
+        id: `act-${Date.now()}`,
+        time: 'Just now',
+        title: `Entry Denied for ${visitor?.name || 'Visitor'}`,
+        flat: visitor?.flat || resident.flat,
+        type: 'visitor',
+        icon: 'UserX',
+      },
+      ...prev,
+    ]);
+
+    showToast(`Entry denied for ${visitor?.name || 'Visitor'}. Guard notified.`);
   };
 
   const cancelVisitorPass = (id: string) => {
@@ -283,6 +605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Visitor pass cancelled.');
   };
 
+  // Complaint actions
   const submitComplaint = (data: {
     category: ComplaintCategory;
     title: string;
@@ -290,10 +613,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     priority?: ComplaintPriority;
     photoUrl?: string;
   }) => {
-    const ticketId = `TKT-${Math.floor(100 + Math.random() * 900)}`;
+    const ticket = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
     const newComplaint: Complaint = {
-      id: `comp-${Date.now()}`,
-      ticketNumber: ticketId,
+      id: `cmp-${Date.now()}`,
+      ticketNumber: ticket,
       title: data.title,
       category: data.category,
       description: data.description,
@@ -308,42 +631,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timeline: [
         {
           step: 'reported',
-          title: 'Complaint Reported',
+          title: 'Ticket Logged',
           time: 'Just now',
-          note: 'Logged by resident via app',
+          note: 'Complaint registered in society maintenance queue',
           done: true,
         },
+      ],
+      comments: [
         {
-          step: 'assigned',
-          title: 'Work Order Assignment',
-          time: 'In review',
-          note: 'Allocating facility supervisor',
-          done: false,
-        },
-        {
-          step: 'started',
-          title: 'Technician on Site',
-          time: 'Pending',
-          done: false,
-        },
-        {
-          step: 'resolved',
-          title: 'Resolution Sign-off',
-          time: 'Pending',
-          done: false,
+          author: 'System',
+          role: 'System Automated',
+          time: 'Just now',
+          text: 'Ticket created and forwarded to maintenance desk.',
         },
       ],
-      comments: [],
     };
 
     setComplaints((prev) => [newComplaint, ...prev]);
+    createFirestoreComplaint(newComplaint).catch((err) => console.warn(err));
 
-    // Activity
     setActivities((prev) => [
       {
         id: `act-${Date.now()}`,
         time: 'Just now',
-        title: `Complaint reported: ${data.title}`,
+        title: `Reported: ${data.title} (${data.category})`,
         flat: resident.flat,
         type: 'complaint',
         icon: 'Wrench',
@@ -351,7 +662,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
     ]);
 
-    showToast(`Complaint #${ticketId} created successfully.`);
+    showToast(`Ticket #${ticket} raised successfully.`);
     return newComplaint;
   };
 
@@ -359,101 +670,123 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComplaints((prev) =>
       prev.map((c) => {
         if (c.id === id) {
-          const updatedTimeline = c.timeline.map((step) => {
-            if (step.step === status) {
-              return { ...step, done: true, time: 'Just now' };
-            }
-            return step;
-          });
-          return {
+          const updated = {
             ...c,
             status,
-            timeline: updatedTimeline,
+            timeline: [
+              ...c.timeline,
+              {
+                step: status,
+                title: `Status changed to ${status}`,
+                time: 'Just now',
+                done: true,
+              },
+            ],
           };
+          updateFirestoreComplaint(id, updated).catch((err) => console.warn(err));
+          return updated;
         }
         return c;
       })
     );
-    showToast(`Complaint status updated to: ${status}`);
+    showToast(`Complaint status updated to ${status}.`);
   };
 
   const assignComplaint = (id: string, name: string, roleTitle: string, phone: string) => {
     setComplaints((prev) =>
       prev.map((c) => {
         if (c.id === id) {
-          const updatedTimeline = c.timeline.map((step) => {
-            if (step.step === 'assigned') {
-              return { ...step, done: true, time: 'Just now', note: `Assigned to ${name}` };
-            }
-            return step;
-          });
-          return {
+          const updated = {
             ...c,
             status: 'assigned' as ComplaintStatus,
             assignedTo: { name, role: roleTitle, phone },
-            timeline: updatedTimeline,
+            timeline: [
+              ...c.timeline,
+              {
+                step: 'assigned' as ComplaintStatus,
+                title: `Assigned to ${name} (${roleTitle})`,
+                time: 'Just now',
+                note: `Contact: ${phone}`,
+                done: true,
+              },
+            ],
           };
+          updateFirestoreComplaint(id, updated).catch((err) => console.warn(err));
+          return updated;
         }
         return c;
       })
     );
-    showToast(`Technician ${name} assigned to ticket.`);
+    showToast(`Assigned ticket to technician ${name}.`);
   };
 
   const addComplaintComment = (id: string, text: string) => {
     setComplaints((prev) =>
       prev.map((c) => {
         if (c.id === id) {
-          return {
+          const updated = {
             ...c,
             comments: [
               ...c.comments,
               {
-                author: role === 'admin' ? 'Admin Office' : resident.name,
+                author: resident.name,
                 role: role === 'admin' ? 'Admin' : 'Resident',
                 time: 'Just now',
                 text,
               },
             ],
           };
+          updateFirestoreComplaint(id, updated).catch((err) => console.warn(err));
+          return updated;
         }
         return c;
       })
     );
-    showToast('Note added to complaint record.');
+    showToast('Comment posted.');
   };
 
+  // Maintenance bill payment
   const payMaintenanceBill = (billId: string, paymentMethod: string) => {
-    const receiptNum = `NW-REC-${Math.floor(10000 + Math.random() * 90000)}`;
-    const txId = `UPI-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+    const receiptNumber = `RCP-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    const transactionId = `TXN-UPI-${Math.floor(100000000 + Math.random() * 900000000)}`;
 
     setBills((prev) =>
       prev.map((b) => {
-        if (b.id === billId || b.flat === resident.flat) {
+        if (b.id === billId) {
           return {
             ...b,
-            status: 'Paid' as const,
+            status: 'Paid',
             paidAt: 'Just now',
             paymentMethod,
-            transactionId: txId,
+            transactionId,
           };
         }
         return b;
       })
     );
 
-    // Update current resident dues
+    // Update in Firestore
+    updateFirestoreBillPayment(billId, paymentMethod, receiptNumber, transactionId).catch((err) =>
+      console.warn(err)
+    );
+
+    // Update resident profile dues
     setResident((prev) => ({
       ...prev,
       dues: 0,
     }));
 
-    // Add activity
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
+
     setActivities((prev) => [
       {
         id: `act-${Date.now()}`,
         time: 'Just now',
-        title: `Payment received ₹4,600`,
+        title: `Payment ₹4,600 received via ${paymentMethod}`,
         flat: resident.flat,
         type: 'payment',
         icon: 'CreditCard',
@@ -461,43 +794,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
     ]);
 
-    // Delightful celebration
-    try {
-      confetti({
-        particleCount: 60,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ['#0F766E', '#22C55E', '#1E293B', '#D97706'],
-      });
-    } catch {
-      // safe fallback
-    }
-
-    showToast('Maintenance fee settled! Official receipt issued.');
-    return { receiptNumber: receiptNum, transactionId: txId };
+    return { receiptNumber, transactionId };
   };
 
-  const bookFacilitySlot = (facilityId: string, slotTime: string, _date: string) => {
+  // Facility booking
+  const bookFacilitySlot = (facilityId: string, slotTime: string, date: string) => {
     setFacilities((prev) =>
       prev.map((f) => {
         if (f.id === facilityId) {
-          const updatedSlots = f.slots.map((s) => {
-            if (s.time === slotTime) {
-              return {
-                ...s,
-                status: 'Booked' as const,
-                bookedBy: `Flat ${resident.flat} (${resident.name})`,
-              };
-            }
-            return s;
-          });
-          return { ...f, slots: updatedSlots };
+          return {
+            ...f,
+            slots: f.slots.map((s) => {
+              if (s.time === slotTime) {
+                return { ...s, status: 'Booked', bookedBy: `${resident.name} (${resident.flat})` };
+              }
+              return s;
+            }),
+          };
         }
         return f;
       })
     );
 
-    // Activity
     const fac = facilities.find((f) => f.id === facilityId);
     setActivities((prev) => [
       {
@@ -515,6 +833,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  // Notice creation
   const createNotice = (data: {
     title: string;
     message: string;
@@ -540,8 +859,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setNotices((prev) => [newNotice, ...prev]);
+    createFirestoreNotice(newNotice).catch((err) => console.warn(err));
 
-    // Activity
     setActivities((prev) => [
       {
         id: `act-${Date.now()}`,
@@ -554,7 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
     ]);
 
-    showToast('Community notice published successfully.');
+    showToast('Community notice published and broadcast to residents.');
     return newNotice;
   };
 
@@ -575,11 +894,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setResidents((prev) => [created, ...prev]);
-    showToast(`Resident ${created.name} added to directory.`);
+    showToast(`Resident ${created.name} added to society directory.`);
+  };
+
+  // Election actions
+  const castVote = async (data: {
+    electionId: string;
+    position: ElectionPosition;
+    candidateId: string;
+    voterId: string;
+    voterFlat: string;
+  }) => {
+    const newVote: Vote = {
+      id: `vote-${Date.now()}`,
+      electionId: data.electionId,
+      position: data.position,
+      candidateId: data.candidateId,
+      voterId: data.voterId,
+      voterFlat: data.voterFlat,
+      castAt: new Date().toISOString(),
+    };
+
+    // Update local state
+    setVotes((prev) => [...prev, newVote]);
+    setNominations((prev) =>
+      prev.map((n) => (n.id === data.candidateId ? { ...n, voteCount: (n.voteCount || 0) + 1 } : n))
+    );
+    setElections((prev) =>
+      prev.map((e) =>
+        e.id === data.electionId ? { ...e, totalVotesCast: (e.totalVotesCast || 0) + 1 } : e
+      )
+    );
+
+    // Persist in Firestore
+    await castFirestoreVote(newVote);
+  };
+
+  const submitNomination = async (
+    data: Omit<Nomination, 'id' | 'status' | 'voteCount' | 'nominatedAt'>
+  ) => {
+    const newNom: Nomination = {
+      ...data,
+      id: `nom-${Date.now()}`,
+      status: 'Pending Review',
+      voteCount: 0,
+      nominatedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    };
+
+    setNominations((prev) => [newNom, ...prev]);
+    await submitFirestoreNomination(newNom);
+  };
+
+  const updateNominationStatus = async (id: string, status: Nomination['status']) => {
+    setNominations((prev) => prev.map((n) => (n.id === id ? { ...n, status } : n)));
+    await updateFirestoreNominationStatus(id, status);
+    showToast(`Nomination status updated to ${status}.`);
+  };
+
+  const createElection = async (
+    data: Omit<Election, 'id' | 'totalVotesCast' | 'createdAt'>
+  ) => {
+    const newElection: Election = {
+      ...data,
+      id: `elec-${Date.now()}`,
+      totalVotesCast: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    setElections((prev) => [newElection, ...prev]);
+    await createFirestoreElection(newElection);
+  };
+
+  const updateElectionStatus = async (id: string, status: Election['status']) => {
+    setElections((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+    await updateFirestoreElection(id, { status });
+    showToast(`Election status updated to ${status}.`);
   };
 
   const triggerGateSimulation = () => {
-    // Check if there is a waiting visitor or generate one
     const rahul = visitors.find((v) => v.name.toLowerCase().includes('rahul'));
     if (rahul) {
       updateVisitorStatus(rahul.id, 'waiting');
@@ -603,7 +995,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: 'Rahul is waiting at Gate 1.',
       });
     }
-    showToast('Simulation: Security has scanned Rahul at Gate 1.');
+    showToast('Simulation: Security guard at Gate 1 scanned Rahul.');
   };
 
   const dismissGateAlert = () => {
@@ -620,12 +1012,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFacilities(INITIAL_FACILITIES);
     setNotices(INITIAL_NOTICES);
     setActivities(INITIAL_ACTIVITIES);
+    setElections(INITIAL_ELECTIONS);
+    setNominations(INITIAL_NOMINATIONS);
+    setVotes(INITIAL_VOTES);
     setGateAlert({
       active: true,
       visitor: INITIAL_VISITORS[0],
       message: 'Rahul is waiting at Gate 1.',
     });
-    showToast('Demo data reset to default state.');
+    showToast('Society demo data reset to default state.');
   };
 
   return (
@@ -633,8 +1028,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         role,
         setRole,
+        user,
+        userProfile,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        isProfileCompletionOpen,
+        setIsProfileCompletionOpen,
+        isElectionModalOpen,
+        setIsElectionModalOpen,
+        isPaymentsResearchOpen,
+        setIsPaymentsResearchOpen,
+        loginWithDemoAccount,
+        completeUserProfile: completeUserProfileHandler,
+        logout,
         society,
         resident,
+        setResident,
         residents,
         addResident,
         visitors,
@@ -655,6 +1064,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notices,
         createNotice,
         activities,
+        elections,
+        nominations,
+        votes,
+        committeeMembers,
+        castVote,
+        submitNomination,
+        updateNominationStatus,
+        createElection,
+        updateElectionStatus,
         gateAlert,
         triggerGateSimulation,
         dismissGateAlert,

@@ -25,10 +25,23 @@ import {
   ChevronDown,
   ExternalLink,
   Smartphone,
+  Vote,
+  Plus,
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
-  const { role, setRole, complaints, visitors, bills } = useApp();
+  const {
+    role,
+    setRole,
+    complaints,
+    visitors,
+    bills,
+    elections,
+    nominations,
+    committeeMembers,
+    setIsElectionModalOpen,
+    setIsPaymentsResearchOpen,
+  } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
 
@@ -39,6 +52,12 @@ export const AdminLayout: React.FC = () => {
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'people', label: 'People', icon: <Users className="w-5 h-5" /> },
     { id: 'visitors', label: 'Visitors', icon: <ShieldCheck className="w-5 h-5" /> },
+    {
+      id: 'elections',
+      label: 'Elections & Board',
+      icon: <Vote className="w-5 h-5" />,
+      badge: 'Live',
+    },
     {
       id: 'complaints',
       label: 'Complaints',
@@ -173,6 +192,134 @@ export const AdminLayout: React.FC = () => {
                   setActiveTab('complaints');
                 }}
               />
+            )}
+
+            {activeTab === 'elections' && (
+              <div className="space-y-6">
+                {/* Header with quick launch action */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                      <Vote className="w-5 h-5 text-indigo-600" />
+                      <span>Society Committee & Digital Elections Portal</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Administer democratic voting cycles, schedule election instances, review nominations, and manage executive committee records.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsPaymentsResearchOpen(true)}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors flex items-center gap-1.5"
+                    >
+                      <CreditCard className="w-4 h-4 text-emerald-600" />
+                      <span>India Payments Stack</span>
+                    </button>
+                    <button
+                      onClick={() => setIsElectionModalOpen(true)}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Manage / Schedule Election</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Top Metrics Banner */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Cycle</span>
+                    <div className="text-xl font-extrabold text-indigo-600 mt-1">2026–2028 RWA</div>
+                    <span className="text-[11px] text-emerald-600 font-bold block mt-0.5">● Voting in Progress</span>
+                  </div>
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ballots Cast</span>
+                    <div className="text-xl font-extrabold text-slate-900 mt-1">
+                      {elections[0]?.totalVotesCast || 142} / 250 Flats
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-semibold block mt-0.5">56.8% Voter Turnout</span>
+                  </div>
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Executive Positions</span>
+                    <div className="text-xl font-extrabold text-slate-900 mt-1">4 Open Roles</div>
+                    <span className="text-[11px] text-slate-500 font-semibold block mt-0.5">President, Secretary, etc.</span>
+                  </div>
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verified Nominees</span>
+                    <div className="text-xl font-extrabold text-slate-900 mt-1">{nominations.length} Approved</div>
+                    <span className="text-[11px] text-indigo-600 font-bold block mt-0.5">All KYC Verified</span>
+                  </div>
+                </div>
+
+                {/* Current Executive Committee Members Grid */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Current RWA Managing Committee</h3>
+                      <p className="text-xs text-slate-500">Elected office-bearers currently presiding over Greenwood Heights</p>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+                      Term: 2024–2026
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    {committeeMembers.map((m) => (
+                      <div key={m.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 flex items-center gap-3">
+                        <img
+                          src={m.avatar}
+                          alt={m.name}
+                          className="w-11 h-11 rounded-full object-cover border-2 border-indigo-200"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-slate-900 truncate">{m.name}</h4>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 inline-block mt-0.5">
+                            {m.position}
+                          </span>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Flat {m.flat} &bull; {m.phone}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nominees & Ballots Quick Review */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Active Candidates & Secret Ballot Tally</h3>
+                      <p className="text-xs text-slate-500">Live vote count stored cryptographically in Firestore</p>
+                    </div>
+                    <button
+                      onClick={() => setIsElectionModalOpen(true)}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                    >
+                      <span>Open Full Ballot Modal</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {nominations.map((nom) => (
+                      <div key={nom.id} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            {nom.position}
+                          </span>
+                          <span className="text-xs font-extrabold text-indigo-600 font-mono">
+                            {nom.voteCount || 0} Votes
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-xs text-slate-900">{nom.candidateName}</h4>
+                        <p className="text-[11px] text-slate-500">Flat {nom.flat} &bull; {nom.profession}</p>
+                        <p className="text-[10px] text-slate-600 italic mt-2 bg-slate-50 p-2 rounded-lg line-clamp-2">
+                          &ldquo;{nom.manifesto}&rdquo;
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
 
             {activeTab === 'people' && <AdminPeople />}

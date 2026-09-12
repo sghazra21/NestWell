@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isAuthenticated();
+    }
+
+    // Visitors Collection
+    match /visitors/{visitorId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Complaints Collection
+    match /complaints/{complaintId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Bills Collection
+    match /bills/{billId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Facilities Collection
+    match /facilities/{facilityId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Facility Bookings Collection
+    match /facility_bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Notices Collection
+    match /notices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Society Committee Elections
+    match /elections/{electionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      match /nominations/{nominationId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
+      }
+
+      match /votes/{voteId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated();
+      }
+    }
+  }
+}

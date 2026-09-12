@@ -1,5 +1,24 @@
 export type UserRole = 'resident' | 'security' | 'admin' | 'committee';
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  phone?: string;
+  flat?: string;
+  tower?: string;
+  type?: 'Owner' | 'Tenant';
+  isProfileComplete: boolean;
+  avatar?: string;
+  gateNumber?: string;
+  badgeId?: string;
+  designation?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  createdAt: string;
+}
+
 export interface SocietyInfo {
   name: string;
   subTitle: string;
@@ -31,7 +50,7 @@ export interface ResidentProfile {
 
 export type Resident = ResidentProfile;
 
-export type VisitorStatus = 'expected' | 'waiting' | 'inside' | 'exited';
+export type VisitorStatus = 'expected' | 'waiting' | 'inside' | 'exited' | 'rejected';
 export type VisitorType = 'Guest' | 'Delivery' | 'Service' | 'Cab';
 
 export interface Visitor {
@@ -159,4 +178,75 @@ export interface ActivityEvent {
   flat: string;
   type: 'visitor' | 'payment' | 'complaint' | 'notice' | 'facility';
   icon: string;
+}
+
+// Society Committee, Nomination & Election Types
+export type ElectionStatus = 'Draft' | 'Nomination Open' | 'Voting Active' | 'Completed';
+
+export type ElectionPosition =
+  | 'President'
+  | 'General Secretary'
+  | 'Treasurer'
+  | 'Cultural Secretary'
+  | 'Maintenance & Facilities Head'
+  | 'Security Committee Head';
+
+export interface Nomination {
+  id: string;
+  electionId: string;
+  position: ElectionPosition;
+  candidateId: string;
+  candidateName: string;
+  flat: string;
+  tower: string;
+  phone: string;
+  email: string;
+  profession: string;
+  yearsInSociety: number;
+  manifesto: string;
+  status: 'Pending Review' | 'Approved' | 'Rejected' | 'Withdrawn';
+  voteCount: number;
+  avatar?: string;
+  nominatedAt: string;
+}
+
+export interface Vote {
+  id: string;
+  electionId: string;
+  position: ElectionPosition;
+  candidateId: string;
+  voterId: string;
+  voterFlat: string;
+  castAt: string;
+}
+
+export interface Election {
+  id: string;
+  title: string;
+  term: string; // e.g. "2026-2028"
+  description: string;
+  positions: ElectionPosition[];
+  nominationStart: string;
+  nominationEnd: string;
+  votingStart: string;
+  votingEnd: string;
+  status: ElectionStatus;
+  eligibleVotersCount: number;
+  totalVotesCast: number;
+  createdAt: string;
+  completedAt?: string;
+  resultsDeclared?: boolean;
+}
+
+export interface CommitteeMember {
+  id: string;
+  name: string;
+  position: ElectionPosition;
+  flat: string;
+  tower: string;
+  phone: string;
+  email: string;
+  term: string;
+  avatar?: string;
+  responsibilities: string[];
 }

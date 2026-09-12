@@ -1,12 +1,32 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Shield, Home, LayoutDashboard, Smartphone, Monitor, BellRing, RotateCcw } from 'lucide-react';
+import {
+  Shield,
+  Home,
+  LayoutDashboard,
+  Smartphone,
+  Monitor,
+  BellRing,
+  RotateCcw,
+  Vote,
+  CreditCard,
+  User,
+  LogOut,
+  Sparkles,
+} from 'lucide-react';
 import { UserRole } from '../../types';
 
 export const RoleSwitcher: React.FC = () => {
   const {
     role,
     setRole,
+    user,
+    userProfile,
+    setIsAuthModalOpen,
+    setIsProfileCompletionOpen,
+    setIsElectionModalOpen,
+    setIsPaymentsResearchOpen,
+    logout,
     previewMode,
     setPreviewMode,
     triggerGateSimulation,
@@ -68,18 +88,82 @@ export const RoleSwitcher: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Simulation Trigger & Viewport Controls */}
-        <div className="flex items-center gap-2">
+        {/* Global Features & Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Society Elections & Committee Button */}
+          <button
+            id="elections-portal-btn"
+            onClick={() => setIsElectionModalOpen(true)}
+            title="Open Society Committee Election & Digital Ballot Portal"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 font-semibold transition-colors shadow-xs"
+          >
+            <Vote className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Committee & Elections</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+
+          {/* Indian Payments Research Blueprint Button */}
+          <button
+            id="india-payments-btn"
+            onClick={() => setIsPaymentsResearchOpen(true)}
+            title="Explore Indian Society Payment Stack (UPI, QR, Gateways & GST)"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-semibold transition-colors shadow-xs"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span>India Payments (UPI)</span>
+          </button>
+
           {/* Gate scan simulation button */}
           <button
             id="simulate-gate-btn"
             onClick={triggerGateSimulation}
             title="Simulate security scanning a visitor pass at Gate 1"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-semibold transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-semibold transition-colors shadow-xs"
           >
             <BellRing className="w-3.5 h-3.5 animate-bounce text-orange-400" />
-            <span>Simulate Gate Scan</span>
+            <span className="hidden sm:inline">Simulate Gate Scan</span>
+            <span className="sm:hidden">Gate Scan</span>
           </button>
+
+          {/* Firebase Authentication & User Profile Button */}
+          {user ? (
+            <div className="flex items-center gap-1 bg-slate-800/90 pl-2 pr-1 py-1 rounded-xl border border-slate-700">
+              <button
+                onClick={() => setIsProfileCompletionOpen(true)}
+                title="Edit verified society profile"
+                className="flex items-center gap-1.5 hover:text-indigo-300 text-left transition-colors"
+              >
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || 'User'}
+                    className="w-5 h-5 rounded-full object-cover border border-slate-600"
+                  />
+                ) : (
+                  <User className="w-3.5 h-3.5 text-indigo-400" />
+                )}
+                <span className="font-bold max-w-[100px] truncate text-slate-200 text-[11px]">
+                  {user.displayName || user.email?.split('@')[0] || 'Member'}
+                </span>
+              </button>
+              <button
+                onClick={logout}
+                title="Sign Out"
+                className="p-1 hover:text-red-400 text-slate-400 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              id="auth-login-btn"
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-xs active:scale-95"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Firebase Auth</span>
+            </button>
+          )}
 
           {/* Device Mockup Toggle for Resident & Security when on desktop */}
           {(role === 'resident' || role === 'security') && (

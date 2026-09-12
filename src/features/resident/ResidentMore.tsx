@@ -12,16 +12,49 @@ import {
   PhoneCall,
   ChevronRight,
   Shield,
-  LogOut,
-  ParkingCircle,
-  Lock,
+  Vote,
+  CreditCard,
+  UserCheck,
+  Building,
 } from 'lucide-react';
 
 export const ResidentMore: React.FC = () => {
-  const { resident, setRole } = useApp();
+  const {
+    resident,
+    setRole,
+    setIsElectionModalOpen,
+    setIsPaymentsResearchOpen,
+    setIsProfileCompletionOpen,
+  } = useApp();
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const menuSections = [
+    {
+      title: 'Governance & Payments',
+      items: [
+        {
+          id: 'election',
+          label: 'Society Committee & Elections',
+          sub: 'Digital Ballot, Nominee Manifestos & RWA Board',
+          icon: <Vote className="w-5 h-5 text-indigo-600" />,
+          action: () => setIsElectionModalOpen(true),
+        },
+        {
+          id: 'payments',
+          label: 'India Payments Blueprint & UPI',
+          sub: 'NPCI Spec, Van-ID Bank Reconciliation, RWA GST',
+          icon: <CreditCard className="w-5 h-5 text-emerald-600" />,
+          action: () => setIsPaymentsResearchOpen(true),
+        },
+        {
+          id: 'profile',
+          label: 'Verified Society Profile',
+          sub: 'Owner/Tenant Verification & Move-In Records',
+          icon: <UserCheck className="w-5 h-5 text-blue-600" />,
+          action: () => setIsProfileCompletionOpen(true),
+        },
+      ],
+    },
     {
       title: 'My Residence',
       items: [
@@ -74,7 +107,13 @@ export const ResidentMore: React.FC = () => {
             {sec.items.map((item) => (
               <div
                 key={item.id}
-                onClick={() => setActiveModal(item.id)}
+                onClick={() => {
+                  if ('action' in item && item.action) {
+                    item.action();
+                  } else {
+                    setActiveModal(item.id);
+                  }
+                }}
                 className="p-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-3.5">
@@ -224,7 +263,7 @@ export const ResidentMore: React.FC = () => {
               Verified records for <strong>Flat {resident.flat}</strong> are actively maintained by the Society Secretariat.
             </p>
             <div className="p-3 bg-teal-50 rounded-xl text-xs text-teal-800 font-semibold">
-              All records updated as of September 2024.
+              All records updated as of September 2026.
             </div>
             <button
               onClick={() => setActiveModal(null)}

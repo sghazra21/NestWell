@@ -32,7 +32,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
   onOpenNoticeDetails,
   onNavigateToTab,
 }) => {
-  const { resident, gateAlert, complaints, visitors, notices } = useApp();
+  const { resident, gateAlert, complaints, visitors, notices, setIsElectionModalOpen } = useApp();
 
   const waitingVisitorCount = visitors.filter((v) => v.flat === resident.flat && v.status === 'waiting').length;
   const openComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status !== 'resolved').length;
@@ -129,7 +129,38 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
         </section>
       )}
 
-      {/* 3. Secondary Metric Cards (Visitors & Complaints) */}
+      {/* 3. Society Elections & Governance Highlight */}
+      <section className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900 to-indigo-800 text-white shadow-md relative overflow-hidden">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-700 text-indigo-200 text-[10px] font-bold tracking-wide uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>Society Committee & Elections</span>
+            </span>
+            <h3 className="text-base font-bold tracking-tight text-white pt-1">
+              RWA Executive Committee 2026–2028
+            </h3>
+            <p className="text-xs text-indigo-200/90 leading-relaxed max-w-xs">
+              Digital voting is open. Review verified nominees and cast your confidential secret ballot.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3.5 pt-3 border-t border-indigo-700/80 flex items-center justify-between">
+          <span className="text-[11px] text-indigo-300 font-medium">
+            142 Votes Cast &bull; 4 Positions
+          </span>
+          <button
+            onClick={() => setIsElectionModalOpen(true)}
+            className="px-3.5 py-1.5 bg-white text-indigo-900 font-bold text-xs rounded-xl shadow-xs hover:bg-indigo-50 transition-all flex items-center gap-1"
+          >
+            <span>Cast Ballot</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </section>
+
+      {/* 4. Secondary Metric Cards (Visitors & Complaints) */}
       <section className="grid grid-cols-2 gap-3">
         {/* Visitors */}
         <div
