@@ -118,15 +118,28 @@ Ask the AI Studio assistant at any time to "deploy firestore rules", and the sys
 - Inside Google AI Studio, click the **Deploy** button at the top-right.
 - The build container will run `npm run build` and launch the production container on Cloud Run with automatic SSL and scalable HTTPS ingress.
 
-### 2. Firebase Hosting
-```bash
-# Initialize Firebase Hosting
-npx firebase init hosting
+### 2. Firebase Hosting (Pre-Configured with `firebase.json` & `.firebaserc`)
 
-# Deploy dist output
+Because `firebase.json` and `.firebaserc` are already configured for project `gen-lang-client-0898030963`, deploying to Firebase Hosting takes only 2 commands:
+
+```bash
+# 1. Build the production bundle into /dist
 npm run build
-npx firebase deploy --only hosting --project gen-lang-client-0898030963
+
+# 2. Login to your Google account with access to the Firebase project
+npx firebase login
+
+# 3. Deploy hosting & rules to Firebase
+npx firebase deploy --only hosting
 ```
+
+Your live site will be immediately available at:
+`https://gen-lang-client-0898030963.web.app` or `https://gen-lang-client-0898030963.firebaseapp.com`
+
+#### If using a custom domain on Firebase Hosting:
+1. Go to [Firebase Console > Hosting](https://console.firebase.google.com/project/gen-lang-client-0898030963/hosting)
+2. Click **Add custom domain** (e.g. `society.yourdomain.com`).
+3. Follow the DNS verification steps provided by Firebase.
 
 ### 3. Vercel / Netlify
 - Build command: `npm run build`
