@@ -1,0 +1,81 @@
+import React from 'react';
+import { AppProvider, useApp } from './context/AppContext';
+import { RoleSwitcher } from './components/common/RoleSwitcher';
+import { ResidentApp } from './features/resident/ResidentApp';
+import { SecurityApp } from './features/security/SecurityApp';
+import { AdminLayout } from './features/admin/AdminLayout';
+import { Wifi, Battery, Signal } from 'lucide-react';
+
+const AppContent: React.FC = () => {
+  const { role, previewMode } = useApp();
+
+  if (role === 'admin') {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-100">
+        <RoleSwitcher />
+        <AdminLayout />
+      </div>
+    );
+  }
+
+  // Resident or Security Role
+  const isMobileFrame = previewMode === 'mobile_frame';
+
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
+      <RoleSwitcher />
+
+      <main className="flex-1 flex items-start justify-center p-0 md:p-6 overflow-x-hidden bg-slate-900 md:bg-indigo-50/50">
+        {isMobileFrame ? (
+          /* Realistic Smartphone Mockup Device Frame */
+          <div className="relative my-4 w-full max-w-[390px] h-[844px] bg-slate-900 rounded-[44px] p-3 shadow-2xl border-[6px] border-slate-800 ring-1 ring-slate-700/50 flex flex-col overflow-hidden">
+            {/* Dynamic Island / Notch */}
+            <div className="absolute top-3.5 inset-x-0 z-50 flex justify-center pointer-events-none">
+              <div className="w-28 h-5.5 bg-slate-900 rounded-full flex items-center justify-between px-2.5">
+                <div className="w-2 h-2 rounded-full bg-slate-800" />
+                <div className="w-2 h-2 rounded-full bg-indigo-950" />
+              </div>
+            </div>
+
+            {/* Mobile Status Bar */}
+            <div className="h-9 px-6 flex items-center justify-between text-slate-700 text-xs font-bold shrink-0 bg-[#F9FAFB] select-none pt-1">
+              <span>9:41</span>
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <Signal className="w-3.5 h-3.5" />
+                <Wifi className="w-3.5 h-3.5" />
+                <Battery className="w-4 h-4" />
+              </div>
+            </div>
+
+            {/* Screen Inner Viewport */}
+            <div className="flex-1 rounded-[32px] overflow-y-auto bg-[#F9FAFB] shadow-inner flex flex-col relative">
+              {role === 'resident' && <ResidentApp />}
+              {role === 'security' && <SecurityApp />}
+            </div>
+
+            {/* Home Indicator Bar */}
+            <div className="h-4 flex items-center justify-center bg-[#F9FAFB] rounded-b-[32px] shrink-0">
+              <div className="w-32 h-1 bg-slate-300 rounded-full" />
+            </div>
+          </div>
+        ) : (
+          /* Fluid Viewport (Responsive mobile view) */
+          <div className="w-full min-h-screen bg-[#F9FAFB] flex justify-center">
+            <div className="w-full max-w-lg min-h-screen bg-[#F9FAFB] shadow-xl">
+              {role === 'resident' && <ResidentApp />}
+              {role === 'security' && <SecurityApp />}
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  );
+}

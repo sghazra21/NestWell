@@ -1,0 +1,6 @@
+{
+  "name": "NestWell - Society & Apartment Management Platform",
+  "description": "A calm, accessible society and apartment management platform with resident mobile app, security gate console, and comprehensive admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
