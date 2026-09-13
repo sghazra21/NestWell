@@ -10,6 +10,7 @@ import { PayMaintenanceModal } from './PayMaintenanceModal';
 import { BookFacilityModal } from './BookFacilityModal';
 import { GateApprovalModal } from './GateApprovalModal';
 import { NotificationBell } from '../../components/common/NotificationBell';
+import { NestWellLogo } from '../../components/branding/NestWellLogo';
 import { Home, Activity, Bell, MoreHorizontal, ShieldAlert, Shield, Building2 } from 'lucide-react';
 
 export const ResidentApp: React.FC = () => {
@@ -28,9 +29,7 @@ export const ResidentApp: React.FC = () => {
       {/* Top Header Bar */}
       <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-30 shadow-2xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-indigo-600 rounded-xl flex items-center justify-center shadow-xs text-white">
-            <Building2 className="w-3.5 h-3.5" />
-          </div>
+          <NestWellLogo variant="icon" className="w-7 h-7 rounded-xl" />
           <span className="font-bold text-sm tracking-tight text-slate-900">NestWell</span>
         </div>
         <div className="flex items-center gap-2">

@@ -52,7 +52,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
 
   const handleStatusChange = (status: ComplaintStatus) => {
     if (!inspectComplaint) return;
-    updateComplaintStatus(inspectComplaint.id, status, resolutionNote);
+    updateComplaintStatus(inspectComplaint.id, status);
     setInspectComplaint((prev) => (prev ? { ...prev, status } : null));
     setResolutionNote('');
   };

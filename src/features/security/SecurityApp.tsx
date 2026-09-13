@@ -77,7 +77,6 @@ export const SecurityApp: React.FC = () => {
     inviteVisitor({
       name: walkInName,
       phone: walkInPhone,
-      flat: walkInFlat,
       type: walkInType,
       purpose: walkInPurpose,
       expectedDate: 'Today',

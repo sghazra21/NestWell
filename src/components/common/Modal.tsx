@@ -53,6 +53,9 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         id="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={`w-full ${maxWidthClasses[maxWidth]} bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all border border-slate-100`}
       >
         {/* Header */}

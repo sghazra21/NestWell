@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 const STEPS = ['Towers', 'Flats', 'Facilities', 'Review & Activate'] as const;
@@ -46,6 +47,10 @@ export const SocietyOnboarding: React.FC = () => {
   const [flatAlphaStart, setFlatAlphaStart] = useState('A');
   const [flatPattern, setFlatPattern] = useState('{prefix}-{floor}{unit:02}');
   const [flatType, setFlatType] = useState<FlatType>('2BHK');
+
+  // CSV import
+  const [csvMode, setCsvMode] = useState(false);
+  const [csvText, setCsvText] = useState('');
 
   const FLAT_PRESETS: { label: string; example: string; pattern: string }[] = [
     { label: 'Tower-Unit (A-101)', example: 'A-101, A-102…', pattern: '{prefix}-{floor}{unit:02}' },
@@ -184,6 +189,62 @@ export const SocietyOnboarding: React.FC = () => {
     }
   };
 
+  const handleCsvImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const tower = towers.find((t) => t.id === flatTowerId);
+    if (!tower) {
+      setError('Select a tower first.');
+      return;
+    }
+    const lines = csvText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    if (lines.length === 0) {
+      setError('Paste at least one line in tower,flatNumber format (e.g. A-101A).');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const existing = new Set(
+        flats.filter((f) => f.towerId === tower.id).map((f) => f.number.toUpperCase())
+      );
+      let created = 0;
+      let skipped = 0;
+      for (const line of lines) {
+        const parts = line.split(/[,\t]/).map((p) => p.trim()).filter(Boolean);
+        const flatNumber = parts.length > 1 ? parts[1] : parts[0];
+        if (existing.has(flatNumber.toUpperCase())) {
+          skipped += 1;
+          continue;
+        }
+        const floorMatch = flatNumber.match(/(\d+)/);
+        const floor = floorMatch ? parseInt(floorMatch[1], 10) : 1;
+        await createFlat({
+          number: flatNumber,
+          towerId: tower.id,
+          towerName: tower.name,
+          floor,
+          type: flatType,
+          status: 'vacant',
+          ownerIds: [],
+          tenantIds: [],
+        });
+        existing.add(flatNumber.toUpperCase());
+        created += 1;
+      }
+      showToast(
+        created > 0
+          ? `${created} flat(s) imported in ${tower.name}${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}.`
+          : `All ${skipped} flat number(s) already exist.`
+      );
+      setCsvText('');
+      setCsvMode(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to import flats from CSV.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleAddFacility = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!facName.trim()) return;
@@ -306,9 +367,9 @@ export const SocietyOnboarding: React.FC = () => {
               <p className="text-xs text-slate-500">No towers yet. Add your first tower below.</p>
             )}
             <form onSubmit={handleAddTower} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              <input value={towerName} onChange={(e) => setTowerName(e.target.value)} placeholder="Tower A" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
-              <input value={towerCode} onChange={(e) => setTowerCode(e.target.value)} placeholder="Code (A)" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
-              <input value={towerFloors} onChange={(e) => setTowerFloors(e.target.value)} placeholder="Floors" inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+              <input value={towerName} onChange={(e) => setTowerName(e.target.value)} placeholder="Tower A" aria-label="Tower name" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+              <input value={towerCode} onChange={(e) => setTowerCode(e.target.value)} placeholder="Code (A)" aria-label="Tower code" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+              <input value={towerFloors} onChange={(e) => setTowerFloors(e.target.value)} placeholder="Floors" inputMode="numeric" aria-label="Number of floors" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
               <button disabled={busy} className="h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1">
                 <Plus className="w-3.5 h-3.5" /> Add
               </button>
@@ -331,13 +392,13 @@ export const SocietyOnboarding: React.FC = () => {
             </p>
             <form onSubmit={handleBulkFlats} className="space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select value={flatTowerId} onChange={(e) => setFlatTowerId(e.target.value)} className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white">
+                <select value={flatTowerId} onChange={(e) => setFlatTowerId(e.target.value)} aria-label="Select tower" className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white">
                   <option value="">Select tower…</option>
                   {towers.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
                 </select>
-                <select value={flatType} onChange={(e) => setFlatType(e.target.value as FlatType)} className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white">
+                <select value={flatType} onChange={(e) => setFlatType(e.target.value as FlatType)} aria-label="Flat type" className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white">
                   {(['1BHK', '2BHK', '3BHK', '4BHK', 'Penthouse', 'Studio'] as FlatType[]).map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -364,14 +425,14 @@ export const SocietyOnboarding: React.FC = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input value={flatPattern} onChange={(e) => setFlatPattern(e.target.value)} placeholder="Pattern: {prefix}-{floor}{unit:02}" spellCheck={false} className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-mono" />
-                <input value={flatPrefix} onChange={(e) => setFlatPrefix(e.target.value)} placeholder="Prefix (default: tower code)" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+                <input value={flatPattern} onChange={(e) => setFlatPattern(e.target.value)} placeholder="Pattern: {prefix}-{floor}{unit:02}" spellCheck={false} aria-label="Numbering pattern" className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-mono" />
+                <input value={flatPrefix} onChange={(e) => setFlatPrefix(e.target.value)} placeholder="Prefix (default: tower code)" aria-label="Flat number prefix" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                <input value={flatFloors} onChange={(e) => setFlatFloors(e.target.value)} placeholder="Floors: 1,2,3" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
-                <input value={flatUnitsPerFloor} onChange={(e) => setFlatUnitsPerFloor(e.target.value)} placeholder="Units/floor" inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
-                <input value={flatUnitStart} onChange={(e) => setFlatUnitStart(e.target.value)} placeholder="Unit start no." inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
-                <input value={flatAlphaStart} onChange={(e) => setFlatAlphaStart(e.target.value.slice(0, 1))} placeholder="Start letter (A)" maxLength={1} className="h-10 px-3 rounded-xl border border-slate-200 text-sm uppercase" />
+                <input value={flatFloors} onChange={(e) => setFlatFloors(e.target.value)} placeholder="Floors: 1,2,3" aria-label="Floor numbers" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+                <input value={flatUnitsPerFloor} onChange={(e) => setFlatUnitsPerFloor(e.target.value)} placeholder="Units/floor" inputMode="numeric" aria-label="Units per floor" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+                <input value={flatUnitStart} onChange={(e) => setFlatUnitStart(e.target.value)} placeholder="Unit start no." inputMode="numeric" aria-label="Unit start number" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+                <input value={flatAlphaStart} onChange={(e) => setFlatAlphaStart(e.target.value.slice(0, 1))} placeholder="Start letter (A)" maxLength={1} aria-label="Start letter" className="h-10 px-3 rounded-xl border border-slate-200 text-sm uppercase" />
               </div>
               <FlatNumberPreview
                 pattern={flatPattern}
@@ -387,6 +448,52 @@ export const SocietyOnboarding: React.FC = () => {
                 <Plus className="w-3.5 h-3.5" /> Create flats
               </button>
             </form>
+
+            {/* CSV Import Toggle */}
+            <div className="border-t border-slate-200 pt-4">
+              <button
+                type="button"
+                onClick={() => setCsvMode(!csvMode)}
+                className="flex items-center gap-2 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                {csvMode ? 'Close CSV paste' : 'Paste CSV list instead'}
+              </button>
+              {csvMode && (
+                <form onSubmit={handleCsvImport} className="mt-3 space-y-2">
+                  <p className="text-[11px] text-slate-500">
+                    Paste flat numbers, one per line or comma-separated. Format: <code className="font-mono bg-slate-100 px-1 rounded">tower,flatNumber</code> or just <code className="font-mono bg-slate-100 px-1 rounded">flatNumber</code>.
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Examples: <span className="font-mono">A, A-101A</span> or <span className="font-mono">B-203C</span>
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select value={flatTowerId} onChange={(e) => setFlatTowerId(e.target.value)} className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white">
+                      <option value="">Select tower…</option>
+                      {towers.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <select value={flatType} onChange={(e) => setFlatType(e.target.value as FlatType)} className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white">
+                      {(['1BHK', '2BHK', '3BHK', '4BHK', 'Penthouse', 'Studio'] as FlatType[]).map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <textarea
+                    value={csvText}
+                    onChange={(e) => setCsvText(e.target.value)}
+                    placeholder={"A-101A\nA-102A\nA-103B\nB-201C, B-202D"}
+                    rows={6}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono resize-y"
+                  />
+                  <button disabled={busy || !csvText.trim()} className="w-full h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1">
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Import from CSV
+                  </button>
+                </form>
+              )}
+            </div>
+
             <div className="flex justify-between">
               <button onClick={back} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 flex items-center gap-1">
                 <ArrowLeft className="w-3.5 h-3.5" /> Back
@@ -415,9 +522,9 @@ export const SocietyOnboarding: React.FC = () => {
               <p className="text-xs text-slate-500">No facilities yet. Add amenities residents can book (or skip — you can add them later).</p>
             )}
             <form onSubmit={handleAddFacility} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              <input value={facName} onChange={(e) => setFacName(e.target.value)} placeholder="Clubhouse" className="h-10 px-3 rounded-xl border border-slate-200 text-sm sm:col-span-2" />
-              <input value={facCapacity} onChange={(e) => setFacCapacity(e.target.value)} placeholder="Capacity" inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
-              <input value={facPrice} onChange={(e) => setFacPrice(e.target.value)} placeholder="₹/hour" inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+              <input value={facName} onChange={(e) => setFacName(e.target.value)} placeholder="Clubhouse" aria-label="Facility name" className="h-10 px-3 rounded-xl border border-slate-200 text-sm sm:col-span-2" />
+              <input value={facCapacity} onChange={(e) => setFacCapacity(e.target.value)} placeholder="Capacity" inputMode="numeric" aria-label="Facility capacity" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+              <input value={facPrice} onChange={(e) => setFacPrice(e.target.value)} placeholder="₹/hour" inputMode="numeric" aria-label="Price per hour" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
               <button disabled={busy} className="h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50 sm:col-span-4 flex items-center justify-center gap-1">
                 <Plus className="w-3.5 h-3.5" /> Add facility
               </button>

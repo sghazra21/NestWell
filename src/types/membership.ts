@@ -4,6 +4,7 @@ export type MembershipStatus = 'pending' | 'active' | 'suspended' | 'removed';
 export interface FamilyMember {
   name: string;
   relation: string;
+  phone?: string;
 }
 
 export type VehicleType = 'Car' | 'Two-Wheeler' | 'EV' | 'Bicycle';

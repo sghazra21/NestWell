@@ -77,6 +77,7 @@ export const NotificationBell: React.FC = () => {
                   }}
                   className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
                   title="Mark all as read"
+                  aria-label="Mark all notifications as read"
                 >
                   <CheckCheck className="w-4 h-4" />
                 </button>
@@ -84,6 +85,7 @@ export const NotificationBell: React.FC = () => {
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                aria-label="Close notifications"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 
 import { ResidentApp } from './features/resident/ResidentApp';
@@ -10,7 +10,7 @@ import { LoginScreen } from './components/auth/LoginScreen';
 import { SocietyPicker } from './components/auth/SocietyPicker';
 import { JoinSociety } from './components/auth/JoinSociety';
 import { SocietyOnboarding } from './features/admin/SocietyOnboarding';
-import { Wifi, Battery, Signal, CheckCircle, Info } from 'lucide-react';
+import { Wifi, Battery, Signal, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 
 const SocietyElectionModal = React.lazy(() =>
   import('./features/election/SocietyElectionModal').then((m) => ({ default: m.SocietyElectionModal }))
@@ -21,6 +21,62 @@ const IndianPaymentsResearchModal = React.lazy(() =>
 const PlatformAdminDashboard = React.lazy(() =>
   import('./features/platform/PlatformAdminDashboard').then((m) => ({ default: m.PlatformAdminDashboard }))
 );
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<
+  { children: ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-7 h-7 text-amber-600" />
+            </div>
+            <h1 className="text-lg font-extrabold text-slate-900">Something went wrong</h1>
+            <p className="text-sm text-slate-500">
+              An unexpected error occurred. Please try reloading the page or return to the home screen.
+            </p>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+              >
+                Reload
+              </button>
+              <button
+                onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
+                className="w-full h-11 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const AppContent: React.FC = () => {
   const {
@@ -233,8 +289,10 @@ const SuspendedGate: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

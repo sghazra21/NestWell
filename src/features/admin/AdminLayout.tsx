@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Avatar } from '../../components/common/Avatar';
+import { NestWellLogo } from '../../components/branding/NestWellLogo';
 import { AdminDashboardOverview } from './AdminDashboardOverview';
 import { AdminPeople } from './AdminPeople';
 import { AdminVisitors } from './AdminVisitors';
@@ -112,9 +113,7 @@ export const AdminLayout: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-xs text-white">
-              <Building2 className="w-4 h-4" />
-            </div>
+            <NestWellLogo variant="icon" className="w-8 h-8 rounded-xl" />
             <div className="flex items-center gap-2">
               <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 line-clamp-1">
                 {currentSociety?.name || 'Society'}
@@ -190,9 +189,7 @@ export const AdminLayout: React.FC = () => {
           <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white shadow-2xl z-10 border-r border-slate-200">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-xs">
-                  <Building2 className="w-4 h-4" />
-                </div>
+                <NestWellLogo variant="icon" className="w-8 h-8 rounded-xl" />
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 line-clamp-1">
                     {currentSociety?.name || 'Society Admin'}
@@ -203,6 +200,7 @@ export const AdminLayout: React.FC = () => {
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                aria-label="Close navigation menu"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -275,6 +273,7 @@ export const AdminLayout: React.FC = () => {
               <button
                 onClick={() => logout()}
                 className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                aria-label="Sign out"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign Out</span>
@@ -354,6 +353,7 @@ export const AdminLayout: React.FC = () => {
             <button
               onClick={() => setActiveTab('visitors')}
               className="mt-2 w-full bg-white/15 hover:bg-white/25 py-1.5 rounded-lg text-center text-xs font-semibold text-slate-100 transition-colors"
+              aria-label="View Visitors Log"
             >
               View Visitors Log
             </button>
@@ -415,7 +415,7 @@ export const AdminLayout: React.FC = () => {
                         <span className="text-xs text-indigo-200">Term: {elections[0].term}</span>
                       </div>
                       <span className="text-xs text-indigo-200 font-mono">
-                        Voting Deadline: {elections[0].endDate}
+                        Voting Deadline: {elections[0].votingEnd}
                       </span>
                     </div>
 
@@ -567,6 +567,7 @@ export const AdminLayout: React.FC = () => {
         <button
           onClick={() => setIsMobileMenuOpen(true)}
           className="flex flex-col items-center justify-center flex-1 py-1 text-slate-500 hover:text-indigo-600"
+          aria-label="All Views"
         >
           <Menu className="w-5 h-5" />
           <span className="text-[10px] font-bold mt-1">All Views</span>
