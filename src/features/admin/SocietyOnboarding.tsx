@@ -42,6 +42,7 @@ export const SocietyOnboarding: React.FC = () => {
   const [flatPrefix, setFlatPrefix] = useState('');
   const [flatFloors, setFlatFloors] = useState('');
   const [flatUnitsPerFloor, setFlatUnitsPerFloor] = useState('4');
+  const [flatUnitStart, setFlatUnitStart] = useState('1');
   const [flatType, setFlatType] = useState<FlatType>('2BHK');
 
   // Facility form
@@ -88,6 +89,7 @@ export const SocietyOnboarding: React.FC = () => {
       .map((f) => parseInt(f.trim(), 10))
       .filter((n) => !isNaN(n) && n > 0);
     const perFloor = Math.max(1, parseInt(flatUnitsPerFloor, 10) || 1);
+    const unitStart = Math.max(1, parseInt(flatUnitStart, 10) || 1);
     if (floors.length === 0) {
       setError('Enter at least one floor number (e.g. 1,2,3).');
       return;
@@ -95,11 +97,20 @@ export const SocietyOnboarding: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
+      // Existing numbers in this tower (never silently overwrite another batch).
+      const existing = new Set(
+        flats.filter((f) => f.towerId === tower.id).map((f) => f.number.toUpperCase())
+      );
       let created = 0;
+      let skipped = 0;
       for (const floor of floors) {
-        for (let u = 1; u <= perFloor; u++) {
-          const unit = String(u).padStart(2, '0');
+        for (let i = 0; i < perFloor; i++) {
+          const unit = String(unitStart + i).padStart(2, '0');
           const number = `${flatPrefix || tower.code}-${floor}${unit}`;
+          if (existing.has(number.toUpperCase())) {
+            skipped += 1;
+            continue;
+          }
           await createFlat({
             number,
             towerId: tower.id,
@@ -110,10 +121,15 @@ export const SocietyOnboarding: React.FC = () => {
             ownerIds: [],
             tenantIds: [],
           });
+          existing.add(number.toUpperCase());
           created += 1;
         }
       }
-      showToast(`${created} flats created in ${tower.name}.`);
+      showToast(
+        created > 0
+          ? `${created} ${flatType} flat(s) created in ${tower.name}${skipped > 0 ? ` (${skipped} already existed, skipped)` : ''}.`
+          : `All ${skipped} flat number(s) already exist — change the unit start number.`
+      );
       setFlatFloors('');
     } catch (err: any) {
       setError(err.message || 'Failed to create flats.');
@@ -265,6 +281,8 @@ export const SocietyOnboarding: React.FC = () => {
             <h2 className="font-bold text-slate-900">Step 2 — Flats</h2>
             <p className="text-xs text-slate-500">
               {flats.length} flat(s) configured. Flats start as <strong>vacant</strong> until members are assigned.
+              For mixed layouts, run one batch per type with a different unit start
+              (e.g. 2BHK units 01–04, then 3BHK units 05–08).
             </p>
             <form onSubmit={handleBulkFlats} className="space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -280,10 +298,11 @@ export const SocietyOnboarding: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                 <input value={flatPrefix} onChange={(e) => setFlatPrefix(e.target.value)} placeholder="Prefix (default: tower code)" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
                 <input value={flatFloors} onChange={(e) => setFlatFloors(e.target.value)} placeholder="Floors: 1,2,3" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
                 <input value={flatUnitsPerFloor} onChange={(e) => setFlatUnitsPerFloor(e.target.value)} placeholder="Units/floor" inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+                <input value={flatUnitStart} onChange={(e) => setFlatUnitStart(e.target.value)} placeholder="Unit start no." inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
               </div>
               <button disabled={busy} className="w-full h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1">
                 <Plus className="w-3.5 h-3.5" /> Create flats
