@@ -29,6 +29,7 @@ import {
   PlatformAnalytics,
   SupportSession,
   AuditLog,
+  PaymentRecord,
 } from '../types';
 import {
   auth,
@@ -84,6 +85,9 @@ import {
   subscribeSupportSessions,
   createSupportSessionRecord,
   sanitizeFirestoreData,
+  createPaymentRecord,
+  updatePaymentRecord,
+  subscribePayments,
 } from '../lib/firestoreService';
 
 interface AppContextType {
@@ -183,6 +187,10 @@ interface AppContextType {
   ) => Promise<string>;
   payMaintenanceBill: (billId: string, paymentMethod: string) => { receiptNumber: string; transactionId: string };
   markBillPaidManually: (billId: string, method: string) => Promise<void>;
+  payments: PaymentRecord[];
+  submitPaymentClaim: (billId: string, amount: number, utr: string, notes?: string) => Promise<string>;
+  verifyPayment: (paymentId: string) => Promise<void>;
+  rejectPayment: (paymentId: string, reason: string) => Promise<void>;
   facilities: Facility[];
   bookFacilitySlot: (facilityId: string, slotTime: string, date: string) => boolean;
   notices: Notice[];
@@ -276,6 +284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [elections, setElections] = useState<Election[]>([]);
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
   // Resident profile for the current user, populated from society membership.
   // Empty until the user's membership and flat assignment resolve.
@@ -483,6 +492,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Payments (UPI / UTR verification)
+    const unsubPayments = subscribePayments(currentSocietyId, (pList) => setPayments(pList));
+
     // Audit logs
     const unsubAudit = subscribeAuditLogs(currentSocietyId, (logs) => setAuditLogs(logs));
 
@@ -498,6 +510,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubBookings();
       unsubNotices();
       unsubElections();
+      unsubPayments();
       unsubAudit();
     };
   }, [currentSocietyId, user?.uid, resident.flat, role]);
@@ -1139,6 +1152,106 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { receiptNumber, transactionId };
   };
 
+  // UPI Payment Claim — resident submits UTR, status = PENDING_VERIFICATION
+  const submitPaymentClaim = async (
+    billId: string,
+    amount: number,
+    utr: string,
+    notes?: string
+  ): Promise<string> => {
+    const bill = bills.find((b) => b.id === billId);
+    if (!bill) throw new Error('Bill not found');
+
+    const flat = flats.find((f) => f.number === resident.flat);
+    const paymentId = await createPaymentRecord(currentSocietyId, {
+      societyId: currentSocietyId,
+      billId,
+      residentId: user?.uid || '',
+      flatId: flat?.id || '',
+      flatNumber: resident.flat,
+      amount,
+      currency: 'INR',
+      paymentMethod: 'UPI',
+      paymentReference: bill.billNumber,
+      utr,
+      status: 'PENDING_VERIFICATION',
+      submittedAt: new Date().toISOString(),
+      submittedBy: resident.name,
+      notes,
+    });
+
+    showToast('Payment submitted for verification. Your bill will be updated once the admin verifies.');
+    return paymentId;
+  };
+
+  // Admin: verify a payment claim
+  const verifyPayment = async (paymentId: string) => {
+    const payment = payments.find((p) => p.id === paymentId);
+    if (!payment) return;
+
+    await updatePaymentRecord(currentSocietyId, paymentId, {
+      status: 'VERIFIED',
+      verifiedAt: new Date().toISOString(),
+      verifiedBy: userProfile?.name || 'Admin',
+    });
+
+    // Update bill status to Paid
+    await processServerConfirmedPayment(currentSocietyId, payment.billId, {
+      method: `UPI (UTR: ${payment.utr || 'N/A'})`,
+      transactionId: payment.utr || `UTR-${Date.now()}`,
+      amount: payment.amount,
+    });
+
+    setBills((prev) =>
+      prev.map((b) =>
+        b.id === payment.billId
+          ? {
+              ...b,
+              status: 'Paid' as const,
+              paidAt: new Date().toISOString(),
+              paymentMethod: 'UPI',
+              transactionId: payment.utr || '',
+            }
+          : b
+      )
+    );
+
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'VERIFY_PAYMENT',
+      targetType: 'PaymentRecord',
+      targetId: paymentId,
+      reason: `Verified UPI payment of ₹${payment.amount} for bill ${payment.paymentReference}`,
+    });
+
+    showToast('Payment verified and bill marked as Paid.');
+  };
+
+  // Admin: reject a payment claim
+  const rejectPayment = async (paymentId: string, reason: string) => {
+    await updatePaymentRecord(currentSocietyId, paymentId, {
+      status: 'REJECTED',
+      rejectionReason: reason,
+      verifiedAt: new Date().toISOString(),
+      verifiedBy: userProfile?.name || 'Admin',
+    });
+
+    const payment = payments.find((p) => p.id === paymentId);
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'REJECT_PAYMENT',
+      targetType: 'PaymentRecord',
+      targetId: paymentId,
+      reason: `Rejected payment: ${reason}`,
+    });
+
+    showToast('Payment rejected. Resident will be notified.');
+  };
+
   // Admin records an offline payment (cash/cheque/bank transfer).
   // Society admins may write bills per security rules; fully audited.
   const markBillPaidManually = async (billId: string, method: string) => {
@@ -1409,6 +1522,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createBill,
         payMaintenanceBill,
         markBillPaidManually,
+        payments,
+        submitPaymentClaim,
+        verifyPayment,
+        rejectPayment,
         facilities,
         bookFacilitySlot,
         notices,

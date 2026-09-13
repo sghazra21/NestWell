@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MaintenanceBill, BillLineItem } from '../../types';
+import { MaintenanceBill, BillLineItem, PaymentRecord } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import {
   CreditCard,
@@ -16,10 +16,12 @@ import {
   Trash2,
   Banknote,
   Receipt,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 
 export const AdminFinance: React.FC = () => {
-  const { bills, flats, members, createBill, markBillPaidManually, showToast } = useApp();
+  const { bills, flats, members, payments, createBill, markBillPaidManually, verifyPayment, rejectPayment, showToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Overdue' | 'Due'>('all');
@@ -28,6 +30,9 @@ export const AdminFinance: React.FC = () => {
   const [selectedBill, setSelectedBill] = useState<MaintenanceBill | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentReference, setPaymentReference] = useState('');
+  const [verificationTab, setVerificationTab] = useState<'bills' | 'verifications'>('bills');
+  const [rejectModalPayment, setRejectModalPayment] = useState<PaymentRecord | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const [selectedFlatId, setSelectedFlatId] = useState('');
   const [billMonth, setBillMonth] = useState(() => {
@@ -139,6 +144,28 @@ export const AdminFinance: React.FC = () => {
     setPaymentReference('');
   };
 
+  const pendingVerifications = payments.filter((p) => p.status === 'PENDING_VERIFICATION');
+  const allPayments = payments;
+
+  const handleVerifyPayment = async (paymentId: string) => {
+    await verifyPayment(paymentId);
+  };
+
+  const handleOpenRejectModal = (payment: PaymentRecord) => {
+    setRejectModalPayment(payment);
+    setRejectReason('');
+  };
+
+  const handleRejectPayment = async () => {
+    if (!rejectModalPayment || !rejectReason.trim()) {
+      showToast('Please enter a reason for rejection');
+      return;
+    }
+    await rejectPayment(rejectModalPayment.id, rejectReason.trim());
+    setRejectModalPayment(null);
+    setRejectReason('');
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -177,6 +204,35 @@ export const AdminFinance: React.FC = () => {
             <span>Export Ledger</span>
           </button>
         </div>
+      </div>
+
+      {/* Tab Switcher */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setVerificationTab('bills')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            verificationTab === 'bills'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Bills & Invoices
+        </button>
+        <button
+          onClick={() => setVerificationTab('verifications')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+            verificationTab === 'verifications'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Payment Verification
+          {pendingVerifications.length > 0 && (
+            <span className="px-1.5 py-0.5 bg-amber-500 text-white text-[10px] rounded-full font-bold">
+              {pendingVerifications.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Create Bill Form */}
@@ -484,6 +540,148 @@ export const AdminFinance: React.FC = () => {
       </div>
 
       {/* Record Payment Modal */}
+
+      {/* Payment Verification Tab */}
+      {verificationTab === 'verifications' && (
+        <div className="space-y-4">
+          {/* Pending Verifications */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="px-5 py-4 border-b border-slate-100 bg-amber-50/50">
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                Pending Verification ({pendingVerifications.length})
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                UPI payments submitted by residents awaiting admin review
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-[#FBF9F5] border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-5 py-3.5">Resident</th>
+                    <th className="px-5 py-3.5">Flat</th>
+                    <th className="px-5 py-3.5">Bill #</th>
+                    <th className="px-5 py-3.5">Amount</th>
+                    <th className="px-5 py-3.5">UTR / TID</th>
+                    <th className="px-5 py-3.5">Submitted</th>
+                    <th className="px-5 py-3.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingVerifications.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-5 py-12 text-center">
+                        <CheckCircle2 className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-slate-900">All clear</h3>
+                        <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                          No pending payment verifications. All submissions have been reviewed.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingVerifications.map((p) => (
+                      <tr key={p.id} className="hover:bg-amber-50/30 transition-colors">
+                        <td className="px-5 py-4 font-bold text-slate-900">{p.submittedBy}</td>
+                        <td className="px-5 py-4">
+                          <span className="font-mono font-bold text-teal-800 bg-teal-50 px-2 py-1 rounded text-xs border border-teal-200/60">
+                            Flat {p.flatNumber}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-xs font-mono text-slate-600">{p.paymentReference}</td>
+                        <td className="px-5 py-4 font-extrabold text-slate-900">
+                          ₹{p.amount.toLocaleString()}
+                        </td>
+                        <td className="px-5 py-4 font-mono text-xs text-slate-700">{p.utr || 'N/A'}</td>
+                        <td className="px-5 py-4 text-xs text-slate-500">
+                          {new Date(p.submittedAt).toLocaleString()}
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleVerifyPayment(p.id)}
+                              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-50 transition-colors flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              Verify
+                            </button>
+                            <button
+                              onClick={() => handleOpenRejectModal(p)}
+                              className="text-xs font-bold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 transition-colors flex items-center gap-1"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* All Payments History */}
+          {allPayments.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+              <div className="px-5 py-4 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Payment History</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-[#FBF9F5] border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3.5">Resident</th>
+                      <th className="px-5 py-3.5">Flat</th>
+                      <th className="px-5 py-3.5">Amount</th>
+                      <th className="px-5 py-3.5">UTR</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Submitted</th>
+                      <th className="px-5 py-3.5">Verified</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {allPayments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-5 py-4 font-bold text-slate-900">{p.submittedBy}</td>
+                        <td className="px-5 py-4 font-mono text-xs text-slate-600">{p.flatNumber}</td>
+                        <td className="px-5 py-4 font-extrabold text-slate-900">
+                          ₹{p.amount.toLocaleString()}
+                        </td>
+                        <td className="px-5 py-4 font-mono text-xs text-slate-700">{p.utr || 'N/A'}</td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                              p.status === 'VERIFIED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : p.status === 'REJECTED'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {p.status === 'PENDING_VERIFICATION'
+                              ? 'Pending'
+                              : p.status === 'VERIFIED'
+                              ? 'Verified'
+                              : 'Rejected'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-xs text-slate-500">
+                          {new Date(p.submittedAt).toLocaleString()}
+                        </td>
+                        <td className="px-5 py-4 text-xs text-slate-500">
+                          {p.verifiedAt ? new Date(p.verifiedAt).toLocaleString() : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <Modal
         isOpen={isRecordPaymentOpen}
         onClose={() => setIsRecordPaymentOpen(false)}
@@ -563,6 +761,58 @@ export const AdminFinance: React.FC = () => {
               >
                 <Receipt className="w-3.5 h-3.5" />
                 <span>Record Payment</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Reject Payment Modal */}
+      <Modal
+        isOpen={!!rejectModalPayment}
+        onClose={() => setRejectModalPayment(null)}
+        title="Reject Payment"
+        subtitle={rejectModalPayment ? `${rejectModalPayment.submittedBy} — ₹${rejectModalPayment.amount.toLocaleString()}` : ''}
+        maxWidth="sm"
+      >
+        {rejectModalPayment && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Flat</span>
+                <span className="font-bold text-slate-900">{rejectModalPayment.flatNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">UTR</span>
+                <span className="font-mono font-bold text-slate-900">{rejectModalPayment.utr}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Rejection Reason
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. UTR not found, amount mismatch, duplicate payment..."
+                rows={3}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setRejectModalPayment(null)}
+                className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejectPayment}
+                disabled={!rejectReason.trim()}
+                className="h-10 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Reject Payment</span>
               </button>
             </div>
           </div>

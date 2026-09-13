@@ -38,6 +38,7 @@ import {
   Nomination,
   Vote,
   UserProfile,
+  PaymentRecord,
 } from '../types';
 
 export enum OperationType {
@@ -998,6 +999,58 @@ export async function processServerConfirmedPayment(
     handleFirestoreError(error, OperationType.UPDATE, path);
     throw error;
   }
+}
+
+// -------------------------------------------------------------
+// 7b. PAYMENT RECORDS (UPI QR / UTR Verification)
+// -------------------------------------------------------------
+
+export async function createPaymentRecord(
+  societyId: string,
+  payment: Omit<PaymentRecord, 'id'>
+): Promise<string> {
+  const id = `pay-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const path = `societies/${societyId}/payments/${id}`;
+  try {
+    const record = { ...payment, id };
+    const clean = sanitizeFirestoreData(record);
+    await setDoc(doc(db, 'societies', societyId, 'payments', id), clean);
+    return id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function updatePaymentRecord(
+  societyId: string,
+  paymentId: string,
+  updates: Partial<PaymentRecord>
+): Promise<void> {
+  const path = `societies/${societyId}/payments/${paymentId}`;
+  try {
+    const clean = sanitizeFirestoreData(updates);
+    await updateDoc(doc(db, 'societies', societyId, 'payments', paymentId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+export function subscribePayments(
+  societyId: string,
+  callback: (payments: PaymentRecord[]) => void
+): () => void {
+  const path = `societies/${societyId}/payments`;
+  return onSnapshot(
+    collection(db, 'societies', societyId, 'payments'),
+    (snapshot) => {
+      const list: PaymentRecord[] = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as PaymentRecord));
+      callback(list);
+    },
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
+  );
 }
 
 // -------------------------------------------------------------

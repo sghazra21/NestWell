@@ -43,6 +43,31 @@ export interface SocietyInfo {
 
 export type NoticePriority = 'normal' | 'urgent';
 
+// Payment types for UPI QR workflow (Phase 31)
+export type PaymentMethod = 'UPI' | 'Cash' | 'Cheque' | 'BankTransfer';
+export type PaymentStatus = 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
+
+export interface PaymentRecord {
+  id: string;
+  societyId: string;
+  billId: string;
+  residentId: string;
+  flatId: string;
+  flatNumber: string;
+  amount: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  paymentReference: string;
+  utr?: string;
+  status: PaymentStatus;
+  submittedAt: string;
+  submittedBy: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  rejectionReason?: string;
+  notes?: string;
+}
+
 export interface ResidentProfile {
   id: string;
   name: string;

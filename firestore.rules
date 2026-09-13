@@ -162,16 +162,17 @@ service cloud.firestore {
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Payments: members may initiate a pending attempt; only society
-      // admins may confirm (offline payments) — enforced below.
+      // Payments: members may initiate a pending UTR claim; only society
+      // admins may verify or reject — enforced below.
       match /payments/{paymentId} {
         allow read: if isSocietyMember(societyId);
-        allow create: if (isSocietyMember(societyId)
-          && request.resource.data.status == 'pending')
-          || isSocietyAdmin(societyId);
-        // Delete allowed for admins (void/correction + society wipe).
+        allow create: if isSocietyMember(societyId)
+          && request.resource.data.status == 'PENDING_VERIFICATION'
+          && request.resource.data.paymentMethod == 'UPI';
+        allow update: if isSocietyAdmin(societyId)
+          && (request.resource.data.status == 'VERIFIED' || request.resource.data.status == 'REJECTED');
+        // Delete allowed for admins (society wipe only).
         allow delete: if isSocietyAdmin(societyId);
-        allow update: if false;
       }
 
       match /facilities/{facilityId} {

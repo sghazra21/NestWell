@@ -4,7 +4,7 @@ import { downloadCSV } from '../../lib/csv';
 import { Users, UserCheck, AlertTriangle, Receipt, CreditCard, FileSpreadsheet } from 'lucide-react';
 
 export const AdminReports: React.FC = () => {
-  const { residents, visitors, complaints, bills, showToast } = useApp();
+  const { residents, visitors, complaints, bills, payments, showToast } = useApp();
 
   const handleExport = (
     data: Record<string, any>[],
@@ -137,6 +137,34 @@ export const AdminReports: React.FC = () => {
             })),
           'payments.csv',
           'Payments',
+        ),
+    },
+    {
+      title: 'UPI Payment Claims',
+      desc: 'All UPI payment submissions with UTR, verification status, and audit trail.',
+      icon: <CreditCard className="w-5 h-5 text-emerald-600" />,
+      count: payments.length,
+      onClick: () =>
+        handleExport(
+          payments.map(p => ({
+            'Payment ID': p.id,
+            'Bill #': p.paymentReference,
+            Flat: p.flatNumber,
+            Resident: p.submittedBy,
+            Amount: p.amount,
+            Currency: p.currency,
+            'Payment Method': p.paymentMethod,
+            UTR: p.utr ?? '',
+            Status: p.status,
+            'Submitted At': p.submittedAt,
+            'Submitted By': p.submittedBy,
+            'Verified At': p.verifiedAt ?? '',
+            'Verified By': p.verifiedBy ?? '',
+            'Rejection Reason': p.rejectionReason ?? '',
+            Notes: p.notes ?? '',
+          })),
+          'upi-payment-claims.csv',
+          'UPI Payment Claims',
         ),
     },
   ];
