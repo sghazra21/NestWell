@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { createSocietyInvite } from '../../lib/firestoreService';
+import { LocationPicker, PickedLocation } from '../../components/common/LocationPicker';
 import { Society, SocietyStatus } from '../../types';
 import {
   Building2,
@@ -64,6 +65,7 @@ export const PlatformAdminDashboard: React.FC = () => {
   const [newLegalName, setNewLegalName] = useState('');
   const [newCity, setNewCity] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [newLocation, setNewLocation] = useState<PickedLocation | null>(null);
   const [featureVisitors, setFeatureVisitors] = useState(true);
   const [featureFacilities, setFeatureFacilities] = useState(true);
   const [featureBilling, setFeatureBilling] = useState(true);
@@ -95,8 +97,10 @@ export const PlatformAdminDashboard: React.FC = () => {
       const created = await createSociety({
         name: newName.trim(),
         legalName: newLegalName.trim() || `${newName.trim()} Apartment Owners Association`,
-        city: newCity.trim(),
-        address: newAddress.trim() || `${newName.trim()}, ${newCity.trim()}`,
+        city: newLocation?.city || newCity.trim(),
+        address: newLocation?.displayName || newAddress.trim() || `${newName.trim()}, ${newCity.trim()}`,
+        latitude: newLocation?.latitude,
+        longitude: newLocation?.longitude,
         status: 'pending_admin',
         features: {
           visitorManagement: featureVisitors,
@@ -113,6 +117,7 @@ export const PlatformAdminDashboard: React.FC = () => {
       setNewLegalName('');
       setNewCity('');
       setNewAddress('');
+      setNewLocation(null);
       // Open the invite-admin step immediately
       setCreatedSociety(created);
       setInviteEmail('');
@@ -516,11 +521,19 @@ export const PlatformAdminDashboard: React.FC = () => {
                 <textarea
                   rows={2}
                   placeholder="Plot 42, Financial District, Nanakramguda..."
-                  value={newAddress}
+                  value={newLocation?.displayName || newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
+
+              <LocationPicker
+                onPick={(loc) => {
+                  setNewLocation(loc);
+                  if (loc?.city) setNewCity(loc.city);
+                  if (loc) setNewAddress(loc.displayName);
+                }}
+              />
 
               {/* Feature Flags */}
               <div className="border border-slate-700/60 rounded-xl p-4 bg-slate-900/40 space-y-2">

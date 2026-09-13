@@ -238,6 +238,8 @@ export async function createSocietyRecord(data: Partial<Society> & { name: strin
       legalName: data.legalName || `${data.name} Apartment Owners Welfare Association`,
       city: data.city,
       address: data.address || `${data.name}, ${data.city}`,
+      latitude: data.latitude,
+      longitude: data.longitude,
       status: data.status || 'active',
       timezone: 'Asia/Kolkata',
       currency: 'INR',

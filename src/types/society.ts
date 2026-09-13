@@ -21,6 +21,8 @@ export interface Society {
   legalName: string;
   city: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   status: SocietyStatus;
   timezone: string;
   currency: string;
