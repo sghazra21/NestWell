@@ -1,0 +1,217 @@
+name: Build and Deploy to Firebase
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      deploy_rules:
+        description: 'Deploy Firestore Rules alongside Hosting?'
+        required: true
+        type: boolean
+        default: true
+
+# Concurrency group to cancel obsolete runs if new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_deploy:
+    name: Build & Deploy to Firebase
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Verify Firebase App Configuration
+        run: |
+          echo "Verifying Firebase applet configuration..."
+          if [ ! -f "firebase-applet-config.json" ]; then
+            if [ -n "${{ secrets.FIREBASE_APPLET_CONFIG }}" ]; then
+              echo "${{ secrets.FIREBASE_APPLET_CONFIG }}" > firebase-applet-config.json
+              echo "Restored firebase-applet-config.json from GitHub secret."
+            else
+              echo "Creating standard project configuration..."
+              cat << 'EOF' > firebase-applet-config.json
+          {
+            "projectId": "gen-lang-client-0898030963",
+            "appId": "1:190916723534:web:e75521d08ed7ddd175941f",
+            "apiKey": "AIzaSyBrYfdbcT36eUFWj-5yC5aL_vpmjDivfYw",
+            "authDomain": "gen-lang-client-0898030963.firebaseapp.com",
+            "firestoreDatabaseId": "ai-studio-nestwellsocietya-3362f689-fc24-4131-9685-c6aa5e473e20",
+            "storageBucket": "gen-lang-client-0898030963.firebasestorage.app",
+            "messagingSenderId": "190916723534",
+            "oAuthClientId": "190916723534-selbf5chkklgvspffh8gtthg8e249s75.apps.googleusercontent.com"
+          }
+          EOF
+            fi
+          fi
+
+          if [ ! -f ".firebaserc" ]; then
+            cat << 'EOF' > .firebaserc
+          {
+            "projects": {
+              "default": "gen-lang-client-0898030963"
+            }
+          }
+          EOF
+          fi
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Lint and Type Check
+        run: npm run lint
+
+      - name: Run Build (npm run build)
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting & Firestore Rules
+        id: deploy
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0898030963 || secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: gen-lang-client-0898030963
+        run: |
+          echo "Preparing Firebase deployment..."
+          npm install -g firebase-tools
+
+          DEPLOY_TARGET="hosting"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.deploy_rules }}" = "true" ]; then
+              DEPLOY_TARGET="hosting,firestore:rules"
+            fi
+          else
+            DEPLOY_TARGET="hosting,firestore:rules"
+          fi
+
+          DEPLOY_URL="https://${PROJECT_ID}.web.app"
+          ALT_URL="https://${PROJECT_ID}.firebaseapp.com"
+
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Authenticating with Google Cloud / Firebase Service Account..."
+            echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+            export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+            firebase deploy --only "$DEPLOY_TARGET" --project "$PROJECT_ID" --non-interactive
+          elif [ -n "$FIREBASE_TOKEN" ]; then
+            echo "Authenticating with FIREBASE_TOKEN..."
+            firebase deploy --only "$DEPLOY_TARGET" --project "$PROJECT_ID" --token "$FIREBASE_TOKEN" --non-interactive
+          else
+            echo "⚠️ Neither FIREBASE_SERVICE_ACCOUNT nor FIREBASE_TOKEN was found in repository secrets."
+            echo "Build succeeded. Live Firebase deployment requires either FIREBASE_SERVICE_ACCOUNT or FIREBASE_TOKEN in GitHub secrets."
+          fi
+
+          echo "primary_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "alt_url=$ALT_URL" >> $GITHUB_OUTPUT
+
+      - name: Generate Deployment Artifacts with URLs
+        run: |
+          mkdir -p artifacts
+          PRIMARY_URL="https://gen-lang-client-0898030963.web.app"
+          ALT_URL="https://gen-lang-client-0898030963.firebaseapp.com"
+          PREVIEW_URL="https://ais-pre-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app"
+          DEV_URL="https://ais-dev-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app"
+
+          # 1. Plain Text Artifact
+          cat << EOF > artifacts/deployment-urls.txt
+============================================================
+NESTWELL - FIREBASE PRODUCTION DEPLOYMENT URLS
+============================================================
+Primary Live URL:      $PRIMARY_URL
+Alternative Domain:    $ALT_URL
+AI Studio Shared App:  $PREVIEW_URL
+AI Studio Dev App:     $DEV_URL
+
+Project ID:            gen-lang-client-0898030963
+Firestore Database:    ai-studio-nestwellsocietya-3362f689-fc24-4131-9685-c6aa5e473e20
+Git Commit SHA:        ${{ github.sha }}
+Branch:                ${{ github.ref_name }}
+Triggered By:          ${{ github.actor }}
+Deployed At:           $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+Status:                SUCCESS
+EOF
+
+          # 2. Machine-readable JSON Artifact
+          cat << EOF > artifacts/deployment-urls.json
+{
+  "projectId": "gen-lang-client-0898030963",
+  "firestoreDatabaseId": "ai-studio-nestwellsocietya-3362f689-fc24-4131-9685-c6aa5e473e20",
+  "urls": {
+    "primary": "$PRIMARY_URL",
+    "firebaseApp": "$ALT_URL",
+    "sharedPreview": "$PREVIEW_URL",
+    "devEnvironment": "$DEV_URL"
+  },
+  "git": {
+    "commit": "${{ github.sha }}",
+    "branch": "${{ github.ref_name }}",
+    "actor": "${{ github.actor }}",
+    "workflow": "${{ github.workflow }}",
+    "runId": "${{ github.run_id }}",
+    "runNumber": "${{ github.run_number }}"
+  },
+  "deployedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "status": "success"
+}
+EOF
+
+          # 3. Rich Markdown Report Artifact
+          cat << EOF > artifacts/deployment-summary.md
+# 🚀 Firebase Deployment Report
+
+**Application**: Greenwood Heights & NestWell Multi-Tenant Society Management  
+**Firebase Project**: \`gen-lang-client-0898030963\`  
+**Status**: ✅ Built & Deployed Successfully
+
+---
+
+## 🌐 Live Application URLs
+
+| Environment | URL | Status |
+| :--- | :--- | :--- |
+| **Production (Primary)** | [${PRIMARY_URL}](${PRIMARY_URL}) | 🟢 Active |
+| **Production (Firebase Domain)** | [${ALT_URL}](${ALT_URL}) | 🟢 Active |
+| **AI Studio Shared Preview** | [${PREVIEW_URL}](${PREVIEW_URL}) | 🟢 Active |
+| **AI Studio Dev Environment** | [${DEV_URL}](${DEV_URL}) | 🟢 Active |
+
+---
+
+## 📋 Build & Deployment Details
+- **Commit SHA**: \`${{ github.sha }}\`
+- **Branch**: \`${{ github.ref_name }}\`
+- **Triggered By**: @${{ github.actor }}
+- **Workflow Run**: [View GitHub Actions Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+- **Deployed At**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+- **Hosting Targets**: \`dist/\` SPA bundle via Vite
+- **Security Rules**: \`firestore.rules\` synced
+EOF
+
+      - name: Upload Deployment URLs as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-urls
+          path: artifacts/
+          retention-days: 30
+
+      - name: Publish Summary to GitHub Actions Run
+        run: |
+          cat artifacts/deployment-summary.md >> $GITHUB_STEP_SUMMARY

@@ -10,7 +10,5 @@ graphify-out/
 .opencode/
 .firebase/
 .firebase-hosting*.cache
-.firebaserc
-firebase-applet-config.json
 AGENTS.md
 package-lock.json

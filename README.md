@@ -123,25 +123,35 @@ Ask the AI Studio assistant at any time to "deploy firestore rules", and the sys
 Because `firebase.json` and `.firebaserc` are already configured for project `gen-lang-client-0898030963`, deploying to Firebase Hosting is straightforward:
 
 ```bash
-# 1. Install firebase-tools globally if not already installed (recommended for WSL/Ubuntu)
+# 1. Install firebase-tools globally if not already installed
 npm install -g firebase-tools
 
-# 2. In headless environments or WSL, use --no-localhost to log in via browser link:
-firebase login --no-localhost
+# 2. Login
+firebase login
 
-# 3. Build the production bundle
+# 3. Build & Deploy
 npm run build
-
-# 4. Deploy to Firebase Hosting
-firebase deploy --only hosting
+npm run deploy:firebase
 ```
 
 Your live site will be immediately available at:
 `https://gen-lang-client-0898030963.web.app` or `https://gen-lang-client-0898030963.firebaseapp.com`
 
-#### If using a custom domain on Firebase Hosting:
-1. Go to [Firebase Console > Hosting](https://console.firebase.google.com/project/gen-lang-client-0898030963/hosting)
-2. Click **Add Custom Domain** and follow the DNS TXT / A record verification.
+---
+
+### 3. Automated GitHub Actions CI/CD (`.github/workflows/firebase-deploy.yml`)
+
+The repository includes an automated GitHub Actions CI/CD workflow that:
+1. Triggers on every `push` to `main`/`master`, `pull_request`, or manual `workflow_dispatch`.
+2. Checks out code and provisions Node.js 20 environment.
+3. Installs dependencies and runs `npm run lint` + `npm run build`.
+4. Deploys static build (`dist/`) and `firestore.rules` to Firebase.
+5. Generates deployment reports (`deployment-urls.txt`, `deployment-urls.json`, `deployment-summary.md`) and uploads them as downloadable **GitHub Actions Artifacts** (`deployment-urls`).
+6. Publishes a rich interactive Markdown report directly to `$GITHUB_STEP_SUMMARY`.
+
+#### Required GitHub Secrets (Settings > Secrets and variables > Actions):
+- `FIREBASE_TOKEN` (or `FIREBASE_SERVICE_ACCOUNT`): Generated via `firebase login:ci` or Google Cloud IAM Service Account JSON key with Firebase Hosting Admin & Cloud Datastore User roles.
+- `FIREBASE_APPLET_CONFIG` (Optional): Custom Firebase config override if needed.
 
 ---
 
