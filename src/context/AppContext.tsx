@@ -42,6 +42,7 @@ import {
   subscribeSociety,
   createSocietyRecord,
   updateSocietyStatus as updateSocietyStatusInDb,
+  deleteSocietyRecord,
   subscribeTowers,
   createTowerRecord,
   subscribeFlats,
@@ -97,6 +98,7 @@ interface AppContextType {
   currentMembership: SocietyMember | null;
   createSociety: (data: Partial<Society> & { name: string; city: string }) => Promise<Society>;
   updateSocietyStatus: (societyId: string, status: Society['status']) => Promise<void>;
+  deleteSociety: (societyId: string) => Promise<number>;
   createTower: (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Tower>;
   createFlat: (data: Omit<Flat, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Flat>;
   createFacility: (data: Omit<Facility, 'id' | 'societyId'>) => Promise<Facility>;
@@ -603,6 +605,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reason: `Status changed to ${status}`,
     });
     showToast(`Society status updated to ${status}`);
+  };
+
+  const deleteSociety = async (socId: string): Promise<number> => {
+    const soc = societies.find((s) => s.id === socId);
+    const { deleted } = await deleteSocietyRecord(socId);
+    if (currentSocietyId === socId) {
+      setCurrentSocietyIdState('');
+      localStorage.removeItem('nestwell_current_society_id');
+    }
+    showToast(`“${soc?.name || socId}” deleted (${deleted} documents removed).`);
+    return deleted;
   };
 
   const createTower = async (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => {
@@ -1120,6 +1133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentMembership,
         createSociety,
         updateSocietyStatus,
+        deleteSociety,
         createTower,
         createFlat,
         createFacility,

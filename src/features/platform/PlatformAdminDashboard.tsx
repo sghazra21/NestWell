@@ -32,6 +32,7 @@ export const PlatformAdminDashboard: React.FC = () => {
     setCurrentSocietyId,
     createSociety,
     updateSocietyStatus,
+    deleteSociety,
     startSupportSession,
     supportSessions,
     platformAnalytics,
@@ -47,6 +48,10 @@ export const PlatformAdminDashboard: React.FC = () => {
   const [selectedSocietyForSupport, setSelectedSocietyForSupport] = useState<Society | null>(null);
   const [supportReason, setSupportReason] = useState('');
 
+  // Delete society state (typed-name confirmation)
+  const [societyToDelete, setSocietyToDelete] = useState<Society | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   // Invite Society Admin state (shown right after society creation)
   const [createdSociety, setCreatedSociety] = useState<Society | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -152,6 +157,24 @@ export const PlatformAdminDashboard: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       showToast('Copy failed. Please select the code manually.');
+    }
+  };
+
+  const handleDeleteSociety = async () => {
+    if (!societyToDelete) return;
+    if (deleteConfirmName.trim() !== societyToDelete.name) {
+      showToast('Type the exact society name to confirm deletion.');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deleteSociety(societyToDelete.id);
+      setSocietyToDelete(null);
+      setDeleteConfirmName('');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete society.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -366,12 +389,24 @@ export const PlatformAdminDashboard: React.FC = () => {
                             Suspend
                           </button>
                         ) : (
-                          <button
-                            onClick={() => updateSocietyStatus(soc.id, 'active')}
-                            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold transition-colors"
-                          >
-                            Activate
-                          </button>
+                          <>
+                            <button
+                              onClick={() => updateSocietyStatus(soc.id, 'active')}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold transition-colors"
+                            >
+                              Activate
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSocietyToDelete(soc);
+                                setDeleteConfirmName('');
+                              }}
+                              title="Permanently delete this society and all its data"
+                              className="px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -616,6 +651,47 @@ export const PlatformAdminDashboard: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Society Confirm Modal */}
+      {societyToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-slate-100">
+            <h3 className="text-base font-bold text-red-400">Delete society permanently?</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              This will <strong>irreversibly delete “{societyToDelete.name}”</strong> and
+              everything inside it — towers, flats, members, visitors, complaints,
+              bills, bookings, notices, elections and audit logs. This cannot be undone.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Type <span className="font-mono font-bold text-white">{societyToDelete.name}</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmName}
+                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                placeholder={societyToDelete.name}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setSocietyToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteSociety}
+                disabled={isDeleting || deleteConfirmName.trim() !== societyToDelete.name}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors disabled:opacity-40"
+              >
+                {isDeleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
           </div>
         </div>
       )}

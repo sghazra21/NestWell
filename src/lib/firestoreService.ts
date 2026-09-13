@@ -278,6 +278,108 @@ export async function updateSocietyStatus(societyId: string, status: Society['st
   }
 }
 
+// Subcollections wiped on society deletion (elections handled recursively
+// because nominations/votes nest one level deeper).
+const SOCIETY_SUBCOLLECTIONS = [
+  'towers',
+  'flats',
+  'members',
+  'visitors',
+  'complaints',
+  'bills',
+  'payments',
+  'facilities',
+  'facilityBookings',
+  'notices',
+  'elections',
+  'auditLogs',
+];
+
+/**
+ * Permanently delete a society and its entire subtree. Platform admin only
+ * (enforced by security rules). Active societies must be suspended first —
+ * callers should enforce this; the function double-checks.
+ */
+export async function deleteSocietyRecord(societyId: string): Promise<{ deleted: number }> {
+  const path = `societies/${societyId}`;
+  const socSnap = await getDoc(doc(db, 'societies', societyId));
+  if (!socSnap.exists()) {
+    throw new Error('Society not found.');
+  }
+  if ((socSnap.data() as Society).status === 'active') {
+    throw new Error('Suspend the society before deleting it.');
+  }
+
+  let deleted = 0;
+  let batch = writeBatch(db);
+  let ops = 0;
+  const commits: Promise<void>[] = [];
+  const queueDelete = (ref: Parameters<typeof batch.delete>[0]) => {
+    batch.delete(ref);
+    ops += 1;
+    if (ops >= 400) {
+      commits.push(batch.commit());
+      batch = writeBatch(db);
+      ops = 0;
+    }
+  };
+
+  for (const col of SOCIETY_SUBCOLLECTIONS) {
+    const snap = await getDocs(collection(db, 'societies', societyId, col));
+    for (const d of snap.docs) {
+      if (col === 'elections') {
+        for (const nested of ['nominations', 'votes']) {
+          const nestedSnap = await getDocs(
+            collection(db, 'societies', societyId, 'elections', d.id, nested)
+          );
+          for (const nd of nestedSnap.docs) {
+            queueDelete(nd.ref);
+            deleted += 1;
+          }
+        }
+      }
+      queueDelete(d.ref);
+      deleted += 1;
+    }
+  }
+  queueDelete(doc(db, 'societies', societyId));
+  deleted += 1;
+
+  // Remove related invites and analytics rollup
+  const invitesSnap = await getDocs(
+    query(collection(db, 'societyInvites'), where('societyId', '==', societyId))
+  );
+  for (const d of invitesSnap.docs) {
+    queueDelete(d.ref);
+    deleted += 1;
+  }
+  const analyticsRef = doc(db, 'platformAnalytics', societyId);
+  if ((await getDoc(analyticsRef)).exists()) {
+    queueDelete(analyticsRef);
+    deleted += 1;
+  }
+  commits.push(batch.commit());
+  await Promise.all(commits);
+
+  // Detach the society from member platform profiles
+  try {
+    const usersSnap = await getDocs(
+      query(collection(db, 'platformUsers'), where('societyIds', 'array-contains', societyId))
+    );
+    for (const u of usersSnap.docs) {
+      const ids = ((u.data().societyIds as string[]) || []).filter((id) => id !== societyId);
+      await updateDoc(u.ref, {
+        societyIds: ids,
+        ...(u.data().currentSocietyId === societyId ? { currentSocietyId: '' } : {}),
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, 'platformUsers');
+  }
+
+  return { deleted };
+}
+
 // -------------------------------------------------------------
 // 3. TOWERS & FLATS (First-Class Units)
 // -------------------------------------------------------------
