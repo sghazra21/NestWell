@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from '../../components/common/Avatar';
 import { Election, Nomination, ElectionPosition } from '../../types';
 import {
   Vote as VoteIcon,
@@ -385,17 +386,12 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                             : 'border-slate-200 bg-white hover:border-slate-300'
                         }`}
                       >
-                        <div className="flex items-start gap-3">
-                          <img
-                            src={
-                              cand.avatar ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                cand.candidateName
-                              )}&background=4f46e5&color=fff`
-                            }
-                            alt={cand.candidateName}
-                            className="w-12 h-12 rounded-xl object-cover border border-slate-200"
-                          />
+                      <div className="flex items-start gap-3">
+                        <Avatar
+                          name={cand.candidateName}
+                          src={cand.avatar}
+                          className="w-12 h-12 rounded-xl border border-slate-200 text-sm"
+                        />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-bold text-slate-900 truncate">
@@ -592,10 +588,10 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                     key={member.id}
                     className="p-5 rounded-2xl border border-slate-200 bg-white hover:border-indigo-200 transition-all flex items-start gap-4"
                   >
-                    <img
+                    <Avatar
+                      name={member.name}
                       src={member.avatar}
-                      alt={member.name}
-                      className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
+                      className="w-14 h-14 rounded-2xl border border-slate-200 text-base shrink-0"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">

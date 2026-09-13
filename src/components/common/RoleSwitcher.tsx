@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from './Avatar';
 import {
   Shield,
   Home,
@@ -135,10 +136,10 @@ export const RoleSwitcher: React.FC = () => {
                 className="flex items-center gap-1.5 hover:text-indigo-300 text-left transition-colors"
               >
                 {userProfile.avatar || user?.photoURL ? (
-                  <img
-                    src={userProfile.avatar || user?.photoURL || ''}
-                    alt={userProfile.name || 'User'}
-                    className="w-5 h-5 rounded-full object-cover border border-slate-600"
+                  <Avatar
+                    name={userProfile.name}
+                    src={userProfile.avatar || user?.photoURL || undefined}
+                    className="w-5 h-5 rounded-full border border-slate-600 text-[8px]"
                   />
                 ) : (
                   <User className="w-3.5 h-3.5 text-indigo-400" />

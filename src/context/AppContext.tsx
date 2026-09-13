@@ -327,6 +327,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Resident User',
             role: 'resident',
             phone: fbUser.phoneNumber || '',
+            avatar: fbUser.photoURL || '',
             flat: '',
             tower: '',
             type: 'Owner',
@@ -480,8 +481,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ? { ...prev, role: mapped }
             : prev
       );
+      // Backfill Google photo onto older member records that lack one.
+      if (!currentMembership.avatar && user?.photoURL && user?.uid) {
+        createOrUpdateMemberRecord(currentSocietyId, {
+          uid: user.uid,
+          email: currentMembership.email,
+          name: currentMembership.name,
+          avatar: user.photoURL,
+        }).catch(() => {});
+      }
     }
-  }, [currentMembership]);
+  }, [currentMembership, user?.uid, user?.photoURL]);
 
   // Derive registered users for AdminPeople table
   const registeredUsers: UserProfile[] = members.map((m) => ({

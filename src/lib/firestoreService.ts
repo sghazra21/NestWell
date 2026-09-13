@@ -141,7 +141,14 @@ export async function syncPlatformUser(firebaseUser: FirebaseUser): Promise<Plat
     const snap = await getDoc(userRef);
 
     if (snap.exists()) {
-      return snap.data() as PlatformUser;
+      const existing = snap.data() as PlatformUser;
+      // Backfill avatar from auth provider (Google photo) when missing.
+      if (!existing.avatar && firebaseUser.photoURL) {
+        const updated = { ...existing, avatar: firebaseUser.photoURL };
+        await setDoc(userRef, updated, { merge: true });
+        return updated;
+      }
+      return existing;
     }
 
     // New users are NEVER granted platform_admin here.
@@ -151,6 +158,7 @@ export async function syncPlatformUser(firebaseUser: FirebaseUser): Promise<Plat
       id: firebaseUser.uid,
       email: firebaseUser.email || '',
       name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Resident User'),
+      avatar: firebaseUser.photoURL || '',
       platformRole: null,
       societyIds: [],
       createdAt: new Date().toISOString(),
@@ -685,6 +693,7 @@ export async function acceptSocietyInvite(
       name: fbUser.displayName || userEmail.split('@')[0],
       email: userEmail,
       phone: fbUser.phoneNumber || '',
+      avatar: fbUser.photoURL || '',
       role: invite.intendedRole,
       status: 'active',
       flatId: invite.flatId || '',
@@ -750,6 +759,7 @@ export async function requestSocietyMembership(
         name: fbUser.displayName || userEmail.split('@')[0] || 'New Member',
         email: userEmail,
         phone: fbUser.phoneNumber || '',
+        avatar: fbUser.photoURL || '',
         role: 'resident',
         status: 'pending',
         flatId: '',

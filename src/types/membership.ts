@@ -10,6 +10,7 @@ export interface SocietyMember {
   phone: string;
   role: SocietyRole;
   status: MembershipStatus;
+  avatar?: string;
   flatId?: string;
   flatNumber?: string;
   towerName?: string;

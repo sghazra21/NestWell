@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { Avatar } from '../../components/common/Avatar';
 import { AdminDashboardOverview } from './AdminDashboardOverview';
 import { AdminPeople } from './AdminPeople';
 import { AdminVisitors } from './AdminVisitors';
@@ -269,10 +270,10 @@ export const AdminLayout: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     {committeeMembers.map((m) => (
                       <div key={m.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 flex items-center gap-3">
-                        <img
+                        <Avatar
+                          name={m.name}
                           src={m.avatar}
-                          alt={m.name}
-                          className="w-11 h-11 rounded-full object-cover border-2 border-indigo-200"
+                          className="w-11 h-11 rounded-full border-2 border-indigo-200 text-xs"
                         />
                         <div className="min-w-0 flex-1">
                           <h4 className="text-xs font-bold text-slate-900 truncate">{m.name}</h4>
