@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Modal } from '../../components/common/Modal';
 import { QrCodeView } from '../../components/common/QrCodeView';
 import { Visitor, VisitorType } from '../../types';
+import { openWhatsApp } from '../../lib/whatsapp';
 import { User, Phone, Calendar, Clock, Share2, Trash2, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 interface InviteVisitorModalProps {
@@ -267,7 +268,9 @@ export const InviteVisitorModal: React.FC<InviteVisitorModalProps> = ({ isOpen, 
               id="share-pass-btn"
               type="button"
               onClick={() => {
-                showToast('Share feature coming soon');
+                const societyName = currentSociety?.name || 'Society';
+                const message = `Visitor Pass: ${generatedPass.passNumber}\nName: ${generatedPass.name}\nFlat: ${generatedPass.flat}\nDate/Time: ${generatedPass.expectedDate}, ${generatedPass.expectedTime}\nSociety: ${societyName}\nPre-Approved by: ${resident.name}`;
+                openWhatsApp(phone, message);
               }}
               className="h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm"
             >

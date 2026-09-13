@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../../components/common/Modal';
+import { openWhatsApp } from '../../lib/whatsapp';
 import {
   Home,
   Users,
@@ -16,6 +17,7 @@ import {
   CreditCard,
   UserCheck,
   Building,
+  MessageCircle,
 } from 'lucide-react';
 
 export const ResidentMore: React.FC = () => {
@@ -208,10 +210,25 @@ export const ResidentMore: React.FC = () => {
           maxWidth="sm"
         >
           <div className="space-y-2.5">
-            <div className="p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
-              <p className="text-xs text-slate-500 font-semibold">Emergency contacts not configured</p>
-              <p className="text-[11px] text-slate-400 mt-1">Ask your society admin to add contacts in Settings.</p>
-            </div>
+            {[
+              { name: 'Security Gate', phone: '+911234567890', message: `Emergency help needed at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Police', phone: '100', message: `Police emergency at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Ambulance', phone: '108', message: `Medical emergency at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+            ].map((contact) => (
+              <div key={contact.name} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <h5 className="text-sm font-bold text-slate-900">{contact.name}</h5>
+                  <p className="text-xs text-slate-500">{contact.phone}</p>
+                </div>
+                <button
+                  onClick={() => openWhatsApp(contact.phone, contact.message)}
+                  className="h-9 px-3 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center gap-1 text-xs font-bold transition-colors"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+            ))}
           </div>
         </Modal>
       )}
