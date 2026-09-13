@@ -1,4 +1,4 @@
-# Greenwood Heights — Smart Society Management & Gate Security System
+# NestWell — Smart Society Management & Gate Security System
 
 A modern, full-featured residential society management platform tailored for Indian housing societies (RWA / Co-operative Housing Societies). Built with **React 19**, **TypeScript**, **Tailwind CSS**, and **Firebase (Firestore & Authentication)**.
 
