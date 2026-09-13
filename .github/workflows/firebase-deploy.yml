@@ -82,10 +82,16 @@ jobs:
             echo "Authenticating with Google Cloud Service Account..."
             echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
             export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-            firebase deploy --only "$DEPLOY_TARGET" --project "$PROJECT_ID" --non-interactive
+            if ! firebase deploy --only "$DEPLOY_TARGET" --project "$PROJECT_ID" --non-interactive; then
+              echo "⚠️ Target '$DEPLOY_TARGET' failed. Retrying with 'hosting' only..."
+              firebase deploy --only hosting --project "$PROJECT_ID" --non-interactive
+            fi
           elif [ -n "$FIREBASE_TOKEN" ]; then
             echo "Authenticating with FIREBASE_TOKEN..."
-            firebase deploy --only "$DEPLOY_TARGET" --project "$PROJECT_ID" --token "$FIREBASE_TOKEN" --non-interactive
+            if ! firebase deploy --only "$DEPLOY_TARGET" --project "$PROJECT_ID" --token "$FIREBASE_TOKEN" --non-interactive; then
+              echo "⚠️ Target '$DEPLOY_TARGET' failed. Retrying with 'hosting' only..."
+              firebase deploy --only hosting --project "$PROJECT_ID" --token "$FIREBASE_TOKEN" --non-interactive
+            fi
           else
             echo "Notice: Neither FIREBASE_SERVICE_ACCOUNT nor FIREBASE_TOKEN secret found."
             echo "Build succeeded. To enable automatic live deployments, add FIREBASE_TOKEN or FIREBASE_SERVICE_ACCOUNT to GitHub Secrets."

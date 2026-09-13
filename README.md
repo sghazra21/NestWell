@@ -201,10 +201,17 @@ Service accounts do not expire like tokens and offer granular IAM role security.
 3. Click **Create and Continue**.
 
 ##### Step 3: Assign the Required IAM Roles
-In the **Grant this service account access to project** step, add the following two roles:
-1. **Firebase Hosting Admin** (`roles/firebasehosting.admin`): Required to upload assets to Firebase Hosting.
-2. **Firebase Rules Admin** (`roles/firebaserules.admin`) OR **Cloud Datastore User** (`roles/datastore.user`): Required to deploy `firestore.rules`.
-*(Alternatively, you can assign the single role **Firebase Admin** `roles/firebase.admin`).*
+In the **Grant this service account access to project** step (or via **IAM > Edit Principal** on an existing service account), add the following roles:
+1. **Firebase Hosting Admin** (`roles/firebasehosting.admin`): Required to upload web assets to Firebase Hosting.
+2. **Service Usage Consumer** (`roles/serviceusage.serviceUsageConsumer`): **CRITICAL** — Required by the Firebase CLI to inspect enabled Google APIs (`firestore.googleapis.com`, `firebasehosting.googleapis.com`). Without this, Google returns `403 Permission denied to get service`.
+3. **Firebase Rules Admin** (`roles/firebaserules.admin`): Required to deploy Firestore security rules.
+*(Tip: Or simply assign the single role **Firebase Admin** `roles/firebase.admin`, which includes all of the above).*
+
+> **Already created the service account?** You do not need to generate a new key!  
+> 1. Go to [Google Cloud IAM](https://console.cloud.google.com/iam-admin/iam?project=gen-lang-client-0898030963).  
+> 2. Find your service account in the member list and click the **Pencil (Edit)** icon.  
+> 3. Click **+ Add Another Role** and select **Service Usage Consumer** (`roles/serviceusage.serviceUsageConsumer`).  
+> 4. Click **Save**.
 
 Click **Continue**, then click **Done**.
 
