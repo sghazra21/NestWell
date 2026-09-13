@@ -6,7 +6,7 @@ import { Modal } from '../../components/common/Modal';
 import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles, Loader2, X, Upload } from 'lucide-react';
 
 export const AdminNotices: React.FC = () => {
-  const { notices, createNotice, userProfile, currentSociety, towers, currentSocietyId } = useApp();
+  const { notices, createNotice, userProfile, currentSociety, towers, currentSocietyId, showToast } = useApp();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -56,11 +56,11 @@ export const AdminNotices: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        showToast('File size must be less than 5MB');
         return;
       }
       if (!file.type.startsWith('image/')) {
-        alert('Only image files are allowed');
+        showToast('Only image files are allowed');
         return;
       }
       setAttachmentFile(file);

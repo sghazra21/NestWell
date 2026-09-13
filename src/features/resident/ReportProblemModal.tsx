@@ -31,7 +31,7 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
   onClose,
   initialCategory = 'Plumbing',
 }) => {
-  const { submitComplaint, resident, currentSocietyId } = useApp();
+  const { submitComplaint, resident, currentSocietyId, showToast } = useApp();
 
   const [category, setCategory] = useState<ComplaintCategory>(initialCategory);
   const [title, setTitle] = useState('');
@@ -85,11 +85,11 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        showToast('File size must be less than 5MB');
         return;
       }
       if (!file.type.startsWith('image/')) {
-        alert('Only image files are allowed');
+        showToast('Only image files are allowed');
         return;
       }
       setPhotoFile(file);
