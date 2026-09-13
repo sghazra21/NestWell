@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { auth } from '../../lib/firebase';
 import { requestSocietyMembership } from '../../lib/firestoreService';
-import { Building2, ArrowLeft, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface JoinSocietyProps {
   onBack: () => void;

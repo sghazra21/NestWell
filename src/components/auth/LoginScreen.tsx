@@ -7,8 +7,8 @@ import {
   googleProvider,
 } from '../../lib/firebase';
 import { useApp } from '../../context/AppContext';
+import { NestWellLogo } from '../branding/NestWellLogo';
 import {
-  Building2,
   ShieldCheck,
   Lock,
   Mail,
@@ -97,14 +97,10 @@ export const LoginScreen: React.FC = () => {
       <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+            <NestWellLogo variant="full-on-dark" className="h-9 w-auto" />
             <div>
-              <h1 className="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-2">
-                NestWell <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">Society Platform</span>
-              </h1>
-              <p className="text-[11px] text-slate-400">Multi-society management & gate security</p>
+              <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">Society Platform</span>
+              <p className="text-[11px] text-slate-400 mt-1">Multi-society management & gate security</p>
             </div>
           </div>
 

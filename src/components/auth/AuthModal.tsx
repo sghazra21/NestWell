@@ -7,12 +7,12 @@ import {
   googleProvider,
 } from '../../lib/firebase';
 import { useApp } from '../../context/AppContext';
+import { NestWellLogo } from '../branding/NestWellLogo';
 import {
   Mail,
   Lock,
   User,
   ArrowRight,
-  Building,
   AlertCircle,
   X,
 } from 'lucide-react';
@@ -104,10 +104,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <X className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-xs">
-              <Building className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xs font-bold tracking-wider uppercase text-indigo-400">NestWell</span>
+            <NestWellLogo variant="full-on-dark" className="h-7 w-auto" />
           </div>
           <h3 className="text-2xl font-extrabold tracking-tight">
             {mode === 'signin' ? 'Welcome Back' : 'Create Society Account'}

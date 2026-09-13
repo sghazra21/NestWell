@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { auth } from '../../lib/firebase';
 import { acceptSocietyInvite } from '../../lib/firestoreService';
+import { NestWellLogo } from '../branding/NestWellLogo';
 import {
-  Building2,
   Plus,
   ArrowRight,
   Ticket,
@@ -57,9 +57,7 @@ export const SocietyPicker: React.FC<SocietyPickerProps> = ({ onJoin }) => {
       <header className="border-b border-slate-800/80 bg-slate-950/60 px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+            <NestWellLogo variant="icon" className="w-10 h-10" />
             <div>
               <h1 className="font-extrabold text-lg tracking-tight text-white">NestWell</h1>
               <p className="text-[11px] text-slate-400">Select a society to continue</p>
@@ -130,9 +128,7 @@ export const SocietyPicker: React.FC<SocietyPickerProps> = ({ onJoin }) => {
           </div>
         ) : (
           <div className="p-8 rounded-2xl bg-slate-900/80 border border-slate-700 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto">
-              <Building2 className="w-6 h-6 text-slate-500" />
-            </div>
+            <NestWellLogo variant="icon" className="w-12 h-12 mx-auto opacity-80" />
             <h2 className="font-bold text-white">You are not a member of any society yet</h2>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
               Join with an invitation code from your society administrator, or search for
