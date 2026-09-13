@@ -43,6 +43,19 @@ export interface SocietyInfo {
 
 export type NoticePriority = 'normal' | 'urgent';
 
+export interface AppNotification {
+  id: string;
+  societyId: string;
+  userId: string;
+  type: 'visitor_arrived' | 'visitor_approved' | 'complaint_update' | 'notice_published' | 'booking_confirmed' | 'bill_generated' | 'payment_verified' | 'payment_rejected' | 'election_opened';
+  title: string;
+  message: string;
+  read: boolean;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
+  createdAt: string;
+}
+
 // Payment types for UPI QR workflow (Phase 31)
 export type PaymentMethod = 'UPI' | 'Cash' | 'Cheque' | 'BankTransfer';
 export type PaymentStatus = 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';

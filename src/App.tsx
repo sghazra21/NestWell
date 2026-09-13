@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 
 import { ResidentApp } from './features/resident/ResidentApp';
@@ -6,14 +6,21 @@ import { SecurityApp } from './features/security/SecurityApp';
 import { AdminLayout } from './features/admin/AdminLayout';
 import { AuthModal } from './components/auth/AuthModal';
 import { ProfileCompletionModal } from './components/auth/ProfileCompletionModal';
-import { SocietyElectionModal } from './features/election/SocietyElectionModal';
-import { IndianPaymentsResearchModal } from './components/payment/IndianPaymentsResearchModal';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { SocietyPicker } from './components/auth/SocietyPicker';
 import { JoinSociety } from './components/auth/JoinSociety';
 import { SocietyOnboarding } from './features/admin/SocietyOnboarding';
-import { PlatformAdminDashboard } from './features/platform/PlatformAdminDashboard';
 import { Wifi, Battery, Signal, CheckCircle, Info } from 'lucide-react';
+
+const SocietyElectionModal = React.lazy(() =>
+  import('./features/election/SocietyElectionModal').then((m) => ({ default: m.SocietyElectionModal }))
+);
+const IndianPaymentsResearchModal = React.lazy(() =>
+  import('./components/payment/IndianPaymentsResearchModal').then((m) => ({ default: m.IndianPaymentsResearchModal }))
+);
+const PlatformAdminDashboard = React.lazy(() =>
+  import('./features/platform/PlatformAdminDashboard').then((m) => ({ default: m.PlatformAdminDashboard }))
+);
 
 const AppContent: React.FC = () => {
   const {
@@ -82,6 +89,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
+      <Suspense fallback={null}>
       {activeView === 'platform_admin' ? (
         <PlatformAdminDashboard />
       ) : needsOnboarding ? (
@@ -134,7 +142,10 @@ const AppContent: React.FC = () => {
         </main>
       )}
 
+      </Suspense>
+
       {/* Global Modals Mounted at Root */}
+      <Suspense fallback={null}>
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -154,6 +165,7 @@ const AppContent: React.FC = () => {
         isOpen={isPaymentsResearchOpen}
         onClose={() => setIsPaymentsResearchOpen(false)}
       />
+      </Suspense>
 
       {/* Global Toast Alert Notification */}
       {toastMessage && (

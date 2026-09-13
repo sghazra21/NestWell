@@ -9,7 +9,8 @@ import { ReportProblemModal } from './ReportProblemModal';
 import { PayMaintenanceModal } from './PayMaintenanceModal';
 import { BookFacilityModal } from './BookFacilityModal';
 import { GateApprovalModal } from './GateApprovalModal';
-import { Home, Activity, Bell, MoreHorizontal, ShieldAlert, Shield } from 'lucide-react';
+import { NotificationBell } from '../../components/common/NotificationBell';
+import { Home, Activity, Bell, MoreHorizontal, ShieldAlert, Shield, Building2 } from 'lucide-react';
 
 export const ResidentApp: React.FC = () => {
   const { gateAlert, canAccessAdminView, setViewMode } = useApp();

@@ -10,6 +10,7 @@ import { AdminFacilities } from './AdminFacilities';
 import { AdminNotices } from './AdminNotices';
 import { AdminReports } from './AdminReports';
 import { AdminSettings } from './AdminSettings';
+import { NotificationBell } from '../../components/common/NotificationBell';
 import {
   LayoutDashboard,
   Users,
@@ -139,6 +140,7 @@ export const AdminLayout: React.FC = () => {
 
         {/* Right User Info & Elevated Privileges Toggle */}
         <div className="flex items-center gap-2 sm:gap-4">
+          <NotificationBell />
           {/* Switch to Resident View Button */}
           <button
             id="admin-switch-to-resident-header-btn"

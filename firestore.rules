@@ -248,6 +248,10 @@ service cloud.firestore {
     }
 
     // ---------- Default deny ----------
+    // NOTE: Firestore Security Rules cannot enforce rate limiting.
+    // When Blaze billing is enabled, add Cloud Functions or App Check
+    // with rate limiting to prevent abuse (e.g., payment claim spam,
+    // brute-force invite code guessing, excessive complaint creation).
     match /{document=**} {
       allow read, write: if false;
     }

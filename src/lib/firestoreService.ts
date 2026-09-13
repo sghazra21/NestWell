@@ -39,6 +39,7 @@ import {
   Vote,
   UserProfile,
   PaymentRecord,
+  AppNotification,
 } from '../types';
 
 export enum OperationType {
@@ -1404,7 +1405,87 @@ export async function createSupportSessionRecord(
 }
 
 // -------------------------------------------------------------
-// 13. FIREBASE STORAGE (File Uploads)
+// 13. NOTIFICATIONS (Tenant Subcollection)
+// -------------------------------------------------------------
+
+export async function createNotificationRecord(
+  societyId: string,
+  notification: Omit<AppNotification, 'id'>
+): Promise<string> {
+  const id = `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const path = `societies/${societyId}/notifications/${id}`;
+  try {
+    const record = { ...notification, id };
+    const clean = sanitizeFirestoreData(record);
+    await setDoc(doc(db, 'societies', societyId, 'notifications', id), clean);
+    return id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export function subscribeNotifications(
+  societyId: string,
+  userId: string,
+  callback: (notifications: AppNotification[]) => void
+): () => void {
+  const path = `societies/${societyId}/notifications`;
+  return onSnapshot(
+    query(
+      collection(db, 'societies', societyId, 'notifications'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    ),
+    (snapshot) => {
+      const list: AppNotification[] = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as AppNotification));
+      callback(list);
+    },
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
+  );
+}
+
+export async function markNotificationRead(
+  societyId: string,
+  notificationId: string
+): Promise<void> {
+  const path = `societies/${societyId}/notifications/${notificationId}`;
+  try {
+    await updateDoc(doc(db, 'societies', societyId, 'notifications', notificationId), {
+      read: true,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function markAllNotificationsRead(
+  societyId: string,
+  userId: string
+): Promise<void> {
+  const path = `societies/${societyId}/notifications`;
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'societies', societyId, 'notifications'),
+        where('userId', '==', userId),
+        where('read', '==', false)
+      )
+    );
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => {
+      batch.update(d.ref, { read: true });
+    });
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+// -------------------------------------------------------------
+// 14. FIREBASE STORAGE (File Uploads)
 // -------------------------------------------------------------
 
 const storage = getStorage();
