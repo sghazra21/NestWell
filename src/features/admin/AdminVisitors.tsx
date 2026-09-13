@@ -57,7 +57,7 @@ export const AdminVisitors: React.FC = () => {
       </div>
 
       {/* 3 Metric Pills */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Currently Inside</span>
           <div className="text-2xl font-extrabold text-emerald-700 mt-1">{insideCount} Visitors</div>
@@ -79,7 +79,7 @@ export const AdminVisitors: React.FC = () => {
 
       {/* Filter and search */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -90,7 +90,7 @@ export const AdminVisitors: React.FC = () => {
           />
         </div>
 
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(['all', 'inside', 'expected', 'exited'] as const).map((status) => (
             <button
               key={status}

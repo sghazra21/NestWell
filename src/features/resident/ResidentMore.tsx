@@ -24,6 +24,8 @@ export const ResidentMore: React.FC = () => {
   const {
     resident,
     currentSociety,
+    canAccessAdminView,
+    setViewMode,
     setIsElectionModalOpen,
     setIsPaymentsResearchOpen,
     setIsProfileCompletionOpen,
@@ -32,6 +34,22 @@ export const ResidentMore: React.FC = () => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const menuSections = [
+    ...(canAccessAdminView
+      ? [
+          {
+            title: 'Elevated Society Privileges',
+            items: [
+              {
+                id: 'admin_console',
+                label: 'Society Admin Console',
+                sub: 'Access Flats, Billing, Staff, Visitors & Reports',
+                icon: <Shield className="w-5 h-5 text-indigo-600" />,
+                action: () => setViewMode('admin'),
+              },
+            ],
+          },
+        ]
+      : []),
     {
       title: 'Governance & Payments',
       items: [
@@ -79,7 +97,7 @@ export const ResidentMore: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 space-y-5 max-w-lg mx-auto pb-24">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       {/* Resident Profile Snapshot */}
       <div className="p-5 bg-white rounded-3xl border border-slate-200 shadow-xs flex items-center gap-4">
         <div className="w-16 h-16 rounded-2xl bg-teal-700 text-white flex items-center justify-center font-bold text-xl shadow-md">

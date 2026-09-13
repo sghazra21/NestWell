@@ -9,10 +9,10 @@ import { ReportProblemModal } from './ReportProblemModal';
 import { PayMaintenanceModal } from './PayMaintenanceModal';
 import { BookFacilityModal } from './BookFacilityModal';
 import { GateApprovalModal } from './GateApprovalModal';
-import { Home, Activity, Bell, MoreHorizontal, ShieldAlert } from 'lucide-react';
+import { Home, Activity, Bell, MoreHorizontal, ShieldAlert, Shield } from 'lucide-react';
 
 export const ResidentApp: React.FC = () => {
-  const { gateAlert } = useApp();
+  const { gateAlert, canAccessAdminView, setViewMode } = useApp();
   const [activeTab, setActiveTab] = useState<'home' | 'activity' | 'notices' | 'more'>('home');
 
   // Modal states
@@ -24,6 +24,25 @@ export const ResidentApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-slate-900 flex flex-col antialiased">
+      {/* Admin return banner: Shown to admins viewing resident portal */}
+      {canAccessAdminView && (
+        <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between text-xs sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold">Resident Portal View</span>
+            <span className="hidden sm:inline text-slate-400">• Admin Mode Preview</span>
+          </div>
+          <button
+            id="resident-return-to-admin-btn"
+            onClick={() => setViewMode('admin')}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Admin Console</span>
+          </button>
+        </div>
+      )}
+
       {/* Active Screen View */}
       <main className="flex-1">
         {activeTab === 'home' && (

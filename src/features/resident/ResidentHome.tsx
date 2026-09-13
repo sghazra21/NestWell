@@ -41,9 +41,9 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
   const activeElection = elections[0];
 
   return (
-    <div className="p-4 space-y-5 max-w-lg mx-auto pb-24">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       {/* 1. Sleek Top Indigo Header */}
-      <section className="bg-indigo-700 p-6 pt-7 text-white rounded-b-[32px] -mx-4 -mt-4 mb-4 shadow-sm">
+      <section className="bg-indigo-700 p-6 sm:p-8 text-white rounded-3xl mb-4 shadow-sm">
         <div className="flex justify-between items-start mb-4">
           <div>
             <div className="text-xs text-indigo-200 font-medium">Good evening,</div>
@@ -165,7 +165,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
       )}
 
       {/* 4. Secondary Metric Cards (Visitors & Complaints) */}
-      <section className="grid grid-cols-2 gap-3">
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Visitors */}
         <div
           onClick={() => {
@@ -224,7 +224,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
           <span className="text-xs text-slate-400">One-tap actions</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {/* Invite Visitor */}
           <button
             id="quick-action-invite-btn"

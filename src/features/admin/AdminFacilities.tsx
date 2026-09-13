@@ -88,8 +88,8 @@ export const AdminFacilities: React.FC = () => {
       </div>
 
       {/* Slots Schedule for Selected Facility */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b pb-4">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900">
               {activeFacility.name} — Schedule & Slots
@@ -97,7 +97,7 @@ export const AdminFacilities: React.FC = () => {
             <p className="text-xs text-slate-500">Hourly slots management</p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {(['Saturday', 'Sunday', 'Next Monday'] as const).map((day) => (
               <button
                 key={day}

@@ -15,7 +15,7 @@ export const ResidentActivity: React.FC = () => {
   const residentComplaints = complaints.filter((c) => c.flat === resident.flat);
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       {/* Screen Header */}
       <div className="pt-1">
         <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Activity & Passes</h2>

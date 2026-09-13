@@ -127,7 +127,7 @@ export const AdminFinance: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setIsCreateBillOpen(!isCreateBillOpen)}
             className="h-10 px-4 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
@@ -141,7 +141,7 @@ export const AdminFinance: React.FC = () => {
             className="h-10 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Send Bulk WhatsApp Reminders</span>
+            <span>Send Bulk Reminders</span>
           </button>
 
           <button
@@ -350,7 +350,7 @@ export const AdminFinance: React.FC = () => {
           />
         </div>
 
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(['all', 'Paid', 'Overdue', 'Due'] as const).map((status) => (
             <button
               key={status}

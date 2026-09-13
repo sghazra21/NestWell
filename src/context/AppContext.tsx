@@ -116,6 +116,9 @@ interface AppContextType {
   // User & Auth State
   role: UserRole;
   setRole: (role: UserRole) => void;
+  viewMode: 'admin' | 'resident';
+  setViewMode: (mode: 'admin' | 'resident') => void;
+  canAccessAdminView: boolean;
   user: FirebaseUser | null;
   userProfile: UserProfile | null;
   isAuthModalOpen: boolean;
@@ -309,6 +312,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Platform admin is resolved ONLY from the platformUsers document.
   // Never from email allowlists, localStorage, or client-side flags.
   const isPlatformAdmin = platformUser?.platformRole === 'platform_admin';
+
+  const [viewMode, setViewModeState] = useState<'admin' | 'resident'>('admin');
+
+  const canAccessAdminView = Boolean(
+    role === 'admin' ||
+    role === 'committee' ||
+    isPlatformAdmin ||
+    currentMembership?.role === 'society_admin' ||
+    currentMembership?.role === 'committee'
+  );
+
+  const setViewMode = (mode: 'admin' | 'resident') => {
+    setViewModeState(mode);
+    showToast(
+      mode === 'admin'
+        ? 'Switched to Society Admin Console'
+        : 'Switched to Resident Portal (Viewing as Resident)'
+    );
+  };
 
   const setCurrentSocietyId = (newId: string) => {
     setCurrentSocietyIdState(newId);
@@ -510,6 +532,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
   }, [currentMembership, user?.uid, user?.photoURL]);
+
+  // Synchronize resident profile for the authenticated user (including admins viewing as residents)
+  useEffect(() => {
+    if (currentMembership) {
+      setResident((prev) => ({
+        ...prev,
+        id: currentMembership.uid || user?.uid || prev.id,
+        name: currentMembership.name || user?.displayName || userProfile?.name || prev.name || 'Resident',
+        email: currentMembership.email || user?.email || prev.email,
+        phone: currentMembership.phone || user?.phoneNumber || prev.phone,
+        flat: currentMembership.flatNumber || prev.flat || (flats.length > 0 ? flats[0].number : 'A-101'),
+        tower: currentMembership.towerName || prev.tower || (towers.length > 0 ? towers[0].name : 'Tower A'),
+        type: currentMembership.type || prev.type || 'Owner',
+        status: 'Active',
+        familyMembers: currentMembership.familyMembers || prev.familyMembers || [],
+        vehicles: currentMembership.vehicles || prev.vehicles || [],
+        dues: prev.dues,
+        avatar: currentMembership.avatar || user?.photoURL || prev.avatar,
+      }));
+    } else if (user && (!resident.name || !resident.flat)) {
+      setResident((prev) => ({
+        ...prev,
+        id: user.uid,
+        name: user.displayName || user.email?.split('@')[0] || 'Resident',
+        email: user.email || '',
+        phone: user.phoneNumber || '',
+        flat: prev.flat || (flats.length > 0 ? flats[0].number : 'A-101'),
+        tower: prev.tower || (towers.length > 0 ? towers[0].name : 'Tower A'),
+        status: 'Active',
+        avatar: user.photoURL || prev.avatar,
+      }));
+    }
+  }, [currentMembership, user, userProfile?.name, flats, towers]);
 
   // Derive registered users for AdminPeople table
   const registeredUsers: UserProfile[] = members.map((m) => ({
@@ -1313,6 +1368,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         auditLogs,
         role,
         setRole,
+        viewMode,
+        setViewMode,
+        canAccessAdminView,
         user,
         userProfile,
         isAuthModalOpen,

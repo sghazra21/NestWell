@@ -20,7 +20,7 @@ export const ResidentNotices: React.FC = () => {
   };
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <div>

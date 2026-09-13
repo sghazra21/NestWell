@@ -18,6 +18,9 @@ import { Wifi, Battery, Signal, CheckCircle, Info } from 'lucide-react';
 const AppContent: React.FC = () => {
   const {
     role,
+    viewMode,
+    setViewMode,
+    canAccessAdminView,
     userProfile,
     currentSocietyId,
     currentSociety,
@@ -74,18 +77,21 @@ const AppContent: React.FC = () => {
     (currentSociety.status === 'pending_admin' || currentSociety.status === 'onboarding') &&
     (role === 'admin' || isPlatformAdmin);
 
+  // Elevated privilege view toggle: Admins/Committee can switch between Admin Console and Resident Portal
+  const showAdminConsole = canAccessAdminView && viewMode === 'admin';
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
       {activeView === 'platform_admin' ? (
         <PlatformAdminDashboard />
       ) : needsOnboarding ? (
         <SocietyOnboarding />
-      ) : role === 'admin' ? (
-        <div className="flex-1 bg-slate-100">
+      ) : showAdminConsole ? (
+        <div className="flex-1 bg-slate-100 min-h-screen flex flex-col">
           <AdminLayout />
         </div>
       ) : (
-        <main className="flex-1 flex items-start justify-center p-0 md:p-6 overflow-x-hidden bg-slate-900 md:bg-indigo-50/50">
+        <main className="flex-1 flex items-start justify-center p-0 overflow-x-hidden bg-[#F9FAFB]">
           {isMobileFrame ? (
             /* Realistic Smartphone Mockup Device Frame */
             <div className="relative my-4 w-full max-w-[390px] h-[844px] bg-slate-900 rounded-[44px] p-3 shadow-2xl border-[6px] border-slate-800 ring-1 ring-slate-700/50 flex flex-col overflow-hidden">
@@ -109,8 +115,7 @@ const AppContent: React.FC = () => {
 
               {/* Screen Inner Viewport */}
               <div className="flex-1 rounded-[32px] overflow-y-auto bg-[#F9FAFB] shadow-inner flex flex-col relative">
-                {role === 'resident' && <ResidentApp />}
-                {role === 'security' && <SecurityApp />}
+                {role === 'security' ? <SecurityApp /> : <ResidentApp />}
               </div>
 
               {/* Home Indicator Bar */}
@@ -119,11 +124,10 @@ const AppContent: React.FC = () => {
               </div>
             </div>
           ) : (
-            /* Fluid Viewport (Responsive mobile view) */
-            <div className="w-full min-h-screen bg-[#F9FAFB] flex justify-center">
-              <div className="w-full max-w-lg min-h-screen bg-[#F9FAFB] shadow-xl">
-                {role === 'resident' && <ResidentApp />}
-                {role === 'security' && <SecurityApp />}
+            /* Fluid Viewport (Adapts to Mobile, Tablet, and Laptop/Desktop) */
+            <div className="w-full min-h-screen bg-[#F9FAFB] flex flex-col items-center">
+              <div className="w-full min-h-screen flex flex-col">
+                {role === 'security' ? <SecurityApp /> : <ResidentApp />}
               </div>
             </div>
           )}
