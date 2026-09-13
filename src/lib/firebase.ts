@@ -40,7 +40,6 @@ googleProvider.setCustomParameters({
 export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('[Firebase] Connected to Firestore successfully.');
     return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
@@ -48,7 +47,6 @@ export async function testConnection(): Promise<boolean> {
       return false;
     }
     // Document does not exist error is expected and still means connection is healthy
-    console.log('[Firebase] Firestore reachable (handshake complete).');
     return true;
   }
 }
