@@ -195,8 +195,7 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
               <span>This records an offline payment in the society ledger</span>
             </div>
           </div>
-          )
-        ) : !showReceiptView ? (
+        )) : !showReceiptView ? (
           /* Payment Successful Confirmation */
           <div className="flex flex-col items-center text-center py-2 space-y-4">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border-2 border-emerald-200">
