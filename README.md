@@ -144,14 +144,101 @@ Your live site will be immediately available at:
 The repository includes an automated GitHub Actions CI/CD workflow that:
 1. Triggers on every `push` to `main`/`master`, `pull_request`, or manual `workflow_dispatch`.
 2. Checks out code and provisions Node.js 20 environment.
-3. Installs dependencies and runs `npm run lint` + `npm run build`.
-4. Deploys static build (`dist/`) and `firestore.rules` to Firebase.
-5. Generates deployment reports (`deployment-urls.txt`, `deployment-urls.json`, `deployment-summary.md`) and uploads them as downloadable **GitHub Actions Artifacts** (`deployment-urls`).
-6. Publishes a rich interactive Markdown report directly to `$GITHUB_STEP_SUMMARY`.
+3. Automatically hydrates or verifies `firebase-applet-config.json` and `.firebaserc`.
+4. Installs dependencies and runs `npm run lint` + `npm run build`.
+5. Deploys static build (`dist/`) and `firestore.rules` to Firebase.
+6. Generates deployment reports (`deployment-urls.txt`, `deployment-urls.json`, `deployment-summary.md`) and uploads them as downloadable **GitHub Actions Artifacts** (`deployment-urls`).
+7. Publishes a rich interactive Markdown report directly to the GitHub Actions `$GITHUB_STEP_SUMMARY`.
 
-#### Required GitHub Secrets (Settings > Secrets and variables > Actions):
-- `FIREBASE_TOKEN` (or `FIREBASE_SERVICE_ACCOUNT`): Generated via `firebase login:ci` or Google Cloud IAM Service Account JSON key with Firebase Hosting Admin & Cloud Datastore User roles.
-- `FIREBASE_APPLET_CONFIG` (Optional): Custom Firebase config override if needed.
+---
+
+### 4. How to Set Up CI/CD Authentication Secrets in GitHub
+
+To enable automated deployments from GitHub Actions, you need to provide **either** a **Firebase CI Token** (Method 1) or a **Google Cloud Service Account** (Method 2).
+
+#### Method 1: Get a Firebase CI Token (`FIREBASE_TOKEN`) — Fastest & Easiest (2 minutes)
+
+1. Open your local terminal or command prompt (where you have Node.js installed).
+2. Run the Firebase CI login command:
+   ```bash
+   npx firebase login:ci
+   ```
+   *(Or `firebase login:ci` if `firebase-tools` is installed globally).*
+3. A browser window will open asking you to sign in with your Google account.
+   - Choose the Google account that has access to project `gen-lang-client-0898030963`.
+   - Click **Allow** to grant permissions.
+4. Return to your terminal. You will see an output message like:
+   ```text
+   ✔  Success! Use this token to deploy on a CI server:
+
+   1//04ABC123xyz_LONG_SECRET_TOKEN_STRING_HERE...
+   ```
+5. Copy the entire token string.
+6. In your GitHub repository:
+   - Go to **Settings** > **Secrets and variables** > **Actions**.
+   - Click the green **New repository secret** button.
+   - Set **Name**: `FIREBASE_TOKEN`
+   - Set **Value**: Paste the token string copied in Step 5.
+   - Click **Add secret**.
+
+---
+
+#### Method 2: Google Cloud Service Account (`FIREBASE_SERVICE_ACCOUNT`) — Recommended for Production
+
+Service accounts do not expire like tokens and offer granular IAM role security.
+
+##### Step 1: Open Service Accounts in Google Cloud Console
+1. Navigate to:  
+   [Google Cloud IAM Service Accounts (gen-lang-client-0898030963)](https://console.cloud.google.com/iam-admin/serviceaccounts?project=gen-lang-client-0898030963)
+2. Ensure project **`gen-lang-client-0898030963`** is selected in the top project dropdown.
+
+##### Step 2: Create the Service Account
+1. Click **+ Create Service Account** at the top.
+2. Fill in the details:
+   - **Service account name**: `github-actions-firebase-deploy`
+   - **Service account ID**: `github-actions-deploy`
+   - **Description**: `Deploys Vite bundle and Firestore rules from GitHub Actions`
+3. Click **Create and Continue**.
+
+##### Step 3: Assign the Required IAM Roles
+In the **Grant this service account access to project** step, add the following two roles:
+1. **Firebase Hosting Admin** (`roles/firebasehosting.admin`): Required to upload assets to Firebase Hosting.
+2. **Firebase Rules Admin** (`roles/firebaserules.admin`) OR **Cloud Datastore User** (`roles/datastore.user`): Required to deploy `firestore.rules`.
+*(Alternatively, you can assign the single role **Firebase Admin** `roles/firebase.admin`).*
+
+Click **Continue**, then click **Done**.
+
+##### Step 4: Generate and Download the JSON Key
+1. Find your newly created service account in the list (e.g. `github-actions-deploy@gen-lang-client-0898030963.iam.gserviceaccount.com`).
+2. Click on the service account name or click the **Actions** (three dots) menu and select **Manage keys**.
+3. Click **Add Key** > **Create new key**.
+4. Choose **JSON** and click **Create**.
+5. A `.json` key file will immediately download to your computer.
+
+##### Step 5: Add the Secret to GitHub
+1. Open the downloaded `.json` key file in any text editor (e.g. VS Code, Notepad) and copy the **entire JSON content**.
+2. In your GitHub repository:
+   - Go to **Settings** > **Secrets and variables** > **Actions**.
+   - Click **New repository secret**.
+   - Set **Name**: `FIREBASE_SERVICE_ACCOUNT`  
+     *(or `FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0898030963`)*
+   - Set **Value**: Paste the entire JSON file contents.
+   - Click **Add secret**.
+
+---
+
+### 5. Viewing Deployment URLs and Artifacts
+
+Every time a workflow completes on GitHub Actions:
+1. **Step Summary**: Open the GitHub Actions run to view the formatted Markdown summary displaying clickable URLs:
+   - Primary Hosting: `https://gen-lang-client-0898030963.web.app`
+   - Firebase Domain: `https://gen-lang-client-0898030963.firebaseapp.com`
+   - Preview App: `https://ais-pre-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app`
+   - Dev App: `https://ais-dev-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app`
+2. **Downloadable Artifacts**: Scroll to the bottom of the workflow run to download `deployment-urls.zip`:
+   - `artifacts/deployment-urls.txt` (plaintext)
+   - `artifacts/deployment-urls.json` (machine-readable)
+   - `artifacts/deployment-summary.md` (formatted report)
 
 ---
 

@@ -1,0 +1,15 @@
+============================================================
+NESTWELL - FIREBASE PRODUCTION DEPLOYMENT URLS
+============================================================
+Primary Live URL:      https://gen-lang-client-0898030963.web.app
+Alternative Domain:    https://gen-lang-client-0898030963.firebaseapp.com
+AI Studio Shared App:  https://ais-pre-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app
+AI Studio Dev App:     https://ais-dev-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app
+
+Project ID:            gen-lang-client-0898030963
+Firestore Database:    ai-studio-nestwellsocietya-3362f689-fc24-4131-9685-c6aa5e473e20
+Git Commit SHA:        local-build
+Branch:                main
+Triggered By:          system
+Deployed At:           2026-09-13T07:14:00.753Z
+Status:                SUCCESS

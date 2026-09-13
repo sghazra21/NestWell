@@ -1,0 +1,19 @@
+{
+  "projectId": "gen-lang-client-0898030963",
+  "firestoreDatabaseId": "ai-studio-nestwellsocietya-3362f689-fc24-4131-9685-c6aa5e473e20",
+  "urls": {
+    "primary": "https://gen-lang-client-0898030963.web.app",
+    "firebaseApp": "https://gen-lang-client-0898030963.firebaseapp.com",
+    "sharedPreview": "https://ais-pre-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app",
+    "devEnvironment": "https://ais-dev-zzgr2xzlldzk3vxwc2zpg5-436884437383.asia-southeast1.run.app"
+  },
+  "git": {
+    "commit": "local-build",
+    "branch": "main",
+    "actor": "system",
+    "workflow": "Firebase CI/CD",
+    "runId": ""
+  },
+  "deployedAt": "2026-09-13T07:14:00.753Z",
+  "status": "success"
+}
