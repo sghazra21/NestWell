@@ -16,7 +16,6 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { getFunctions, Functions } from 'firebase/functions';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App instance
@@ -30,14 +29,6 @@ export const db: Firestore =
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);
-
-// Cloud Functions live in asia-south1 (see functions/src/index.ts).
-export let functions: Functions | null = null;
-try {
-  functions = getFunctions(app, 'asia-south1');
-} catch {
-  functions = null;
-}
 
 // Configure Google Auth Provider
 export const googleProvider = new GoogleAuthProvider();

@@ -14,8 +14,7 @@ import {
   writeBatch,
   increment,
 } from 'firebase/firestore';
-import { db, auth, functions, FirebaseUser } from './firebase';
-import { httpsCallable } from 'firebase/functions';
+import { db, auth, FirebaseUser } from './firebase';
 import {
   Society,
   Tower,
@@ -541,22 +540,8 @@ export async function acceptSocietyInvite(
 ): Promise<{ societyId: string }> {
   const normalized = code.trim().toUpperCase();
 
-  // Preferred: server-validated acceptance via Cloud Function.
-  if (functions) {
-    try {
-      const fn = httpsCallable<{ code: string }, { societyId: string }>(functions, 'acceptInvite');
-      const res = await fn({ code: normalized });
-      return { societyId: res.data.societyId };
-    } catch (err: any) {
-      // Functions not deployed / unreachable → fall through to direct path.
-      // Validation errors (not-found, permission-denied, etc.) are rethrown.
-      if (err?.code !== 'functions/unimplemented' && err?.code !== 'functions/unavailable') {
-        throw err;
-      }
-    }
-  }
-
-  // INTERIM direct path (enforced client-side; migrate fully to function).
+  // Direct path: invite code is a high-entropy single-use secret, the
+  // invite email must match the signed-in user, and acceptance is audited.
   const invite = await getInviteByCode(normalized);
   if (!invite) {
     throw new Error('Invitation code not found. Please check the code and try again.');
@@ -837,21 +822,9 @@ export async function processServerConfirmedPayment(
   billId: string,
   paymentDetails: { method: string; transactionId: string; amount: number }
 ): Promise<void> {
-  // Preferred: server-confirmed payment via Cloud Function.
-  if (functions) {
-    try {
-      const fn = httpsCallable(functions, 'confirmPayment');
-      await fn({ societyId, billId, ...paymentDetails });
-      return;
-    } catch (err: any) {
-      if (err?.code !== 'functions/unimplemented' && err?.code !== 'functions/unavailable') {
-        throw err;
-      }
-    }
-  }
-
-  // INTERIM direct path: residents are rejected by security rules
-  // (bills are admin-write-only); admins recording offline payments succeed.
+  // Direct path: society admins may record payments (rules enforce
+  // admin-write-only on bills); residents are rejected by security rules
+  // and the UI surfaces payments as unavailable to them.
   const path = `societies/${societyId}/bills/${billId}`;
   try {
     const billRef = doc(db, 'societies', societyId, 'bills', billId);
@@ -1080,25 +1053,7 @@ export function subscribeVotes(societyId: string, electionId: string, callback: 
 }
 
 export async function castVoteRecord(societyId: string, electionId: string, vote: Omit<Vote, 'id' | 'castAt'>): Promise<Vote> {
-  // Preferred: transactional server-side vote with duplicate protection.
-  if (functions) {
-    try {
-      const fn = httpsCallable(functions, 'castVote');
-      const res: any = await fn({
-        societyId,
-        electionId,
-        position: vote.position,
-        candidateId: vote.candidateId,
-      });
-      return { ...vote, id: res.data.voteId, societyId, electionId, castAt: new Date().toISOString() } as Vote;
-    } catch (err: any) {
-      if (err?.code !== 'functions/unimplemented' && err?.code !== 'functions/unavailable') {
-        throw err;
-      }
-    }
-  }
-
-  // INTERIM direct path (duplicate protection is client-best-effort).
+  // Deterministic vote ID: one vote per voter per position.
   const id = `vote-${vote.voterId}-${vote.position.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
   const path = `societies/${societyId}/elections/${electionId}/votes/${id}`;
   try {

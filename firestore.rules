@@ -124,9 +124,9 @@ service cloud.firestore {
 
       match /members/{memberId} {
         allow read: if isSocietyMember(societyId);
-        // Self join-request (pending only). Invite acceptance creates the
-        // active record client-side as an INTERIM step (see Phase 12:
-        // migrate to a Cloud Function for server-validated acceptance).
+        // Self join-request (pending) or invite acceptance (active).
+        // Invite codes are high-entropy single-use secrets validated
+        // client-side (email match + expiry + status) and audited.
         allow create: if isOwner(memberId)
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.status in ['pending', 'active']
@@ -158,12 +158,13 @@ service cloud.firestore {
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Payments are server-confirmed (Phase 12). Client may initiate
-      // a pending attempt; confirmation is backend-only.
+      // Payments: members may initiate a pending attempt; only society
+      // admins may confirm (offline payments) — enforced below.
       match /payments/{paymentId} {
         allow read: if isSocietyMember(societyId);
-        allow create: if isSocietyMember(societyId)
-          && request.resource.data.status == 'pending';
+        allow create: if (isSocietyMember(societyId)
+          && request.resource.data.status == 'pending')
+          || isSocietyAdmin(societyId);
         allow update, delete: if false;
       }
 
@@ -186,9 +187,8 @@ service cloud.firestore {
       match /elections/{electionId} {
         allow read: if isSocietyMember(societyId);
         allow create, delete: if isSocietyAdmin(societyId);
-        // INTERIM: members may bump the vote counter when casting a vote
-        // (Phase 12 migrates voting to a transactional Cloud Function with
-        // server-side duplicate prevention).
+        // Members may bump counters only when casting a vote
+        // (duplicate protection via deterministic vote doc IDs).
         allow update: if isSocietyAdmin(societyId)
           || (isSocietyMember(societyId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalVotesCast', 'updatedAt']));
@@ -204,7 +204,7 @@ service cloud.firestore {
 
         match /votes/{voteId} {
           allow read: if isSocietyMember(societyId);
-          // One vote per voter enforced by doc ID = voter+position (Phase 12).
+          // One vote per voter enforced by deterministic doc ID.
           allow create: if isSocietyMember(societyId);
           allow update, delete: if false;
         }

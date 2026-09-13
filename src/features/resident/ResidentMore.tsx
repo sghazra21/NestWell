@@ -21,9 +21,7 @@ import {
 export const ResidentMore: React.FC = () => {
   const {
     resident,
-    userProfile,
     currentSociety,
-    setRole,
     setIsElectionModalOpen,
     setIsPaymentsResearchOpen,
     setIsProfileCompletionOpen,
@@ -133,23 +131,6 @@ export const ResidentMore: React.FC = () => {
           </div>
         </div>
       ))}
-
-      {/* Switch to Admin Role helper inside More - only visible to authorized admins */}
-      {(userProfile?.role === 'admin' || userProfile?.id === 'admin-local-master') && (
-        <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl flex items-center justify-between">
-          <div>
-            <h5 className="text-xs font-bold text-teal-900">RWA Committee Access</h5>
-            <p className="text-[11px] text-teal-700">Switch to the full society administration dashboard.</p>
-          </div>
-          <button
-            onClick={() => setRole('admin')}
-            className="px-3.5 py-2 rounded-xl bg-teal-700 text-white font-bold text-xs shadow-sm hover:bg-teal-800 transition-colors"
-          >
-            Open Admin Web
-          </button>
-        </div>
-      )}
-
       {/* Modals for items */}
       {/* 1. Family Members Modal */}
       {activeModal === 'family' && (
