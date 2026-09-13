@@ -1,44 +1,143 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Download, FileText, FileSpreadsheet, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { downloadCSV } from '../../lib/csv';
+import { Users, UserCheck, AlertTriangle, Receipt, CreditCard } from 'lucide-react';
 
 export const AdminReports: React.FC = () => {
-  const { showToast } = useApp();
+  const { residents, visitors, complaints, bills, showToast } = useApp();
+
+  const handleExport = (
+    data: Record<string, any>[],
+    filename: string,
+    label: string,
+  ) => {
+    if (data.length === 0) {
+      showToast(`No ${label.toLowerCase()} data to export`);
+      return;
+    }
+    downloadCSV(data, filename);
+    showToast(`${label} report downloaded (${data.length} rows)`);
+  };
+
   const reports = [
     {
-      title: 'September 2024 Maintenance Ledger',
-      desc: 'Itemized flat-by-flat payment logs, UPI transaction references, and outstanding late fee lists.',
-      format: 'Excel / CSV',
-      size: '142 KB',
-      icon: <FileSpreadsheet className="w-5 h-5 text-emerald-600" />,
+      title: 'Residents Directory',
+      desc: 'Flat-wise roster of all residents with contact, ownership type, and dues.',
+      icon: <Users className="w-5 h-5 text-teal-600" />,
+      count: residents.length,
+      onClick: () =>
+        handleExport(
+          residents.map(r => ({
+            Name: r.name,
+            Flat: r.flat,
+            Tower: r.tower,
+            Phone: r.phone,
+            Email: r.email,
+            Type: r.type,
+            Status: r.status,
+            Dues: r.dues,
+          })),
+          'residents.csv',
+          'Residents',
+        ),
     },
     {
-      title: 'Security Gate Movement Log (Last 30 Days)',
-      desc: 'Complete timestamped log of all visitor entries, deliveries, exits, and pre-approved QR passes.',
-      format: 'PDF',
-      size: '2.1 MB',
-      icon: <FileText className="w-5 h-5 text-blue-600" />,
+      title: 'Visitors Log',
+      desc: 'All visitor entries with entry/exit times, purpose, and pass numbers.',
+      icon: <UserCheck className="w-5 h-5 text-blue-600" />,
+      count: visitors.length,
+      onClick: () =>
+        handleExport(
+          visitors.map(v => ({
+            Name: v.name,
+            Phone: v.phone,
+            Flat: v.flat,
+            Tower: v.tower,
+            Resident: v.residentName,
+            Purpose: v.purpose,
+            Type: v.type,
+            Status: v.status,
+            'Expected Date': v.expectedDate,
+            'Expected Time': v.expectedTime,
+            'Entry Time': v.entryTime ?? '',
+            'Exit Time': v.exitTime ?? '',
+            'Pass Number': v.passNumber,
+          })),
+          'visitors.csv',
+          'Visitors',
+        ),
     },
     {
-      title: 'Annual Society Financial Audit Report (FY 2023-24)',
-      desc: 'Signed by Certified Chartered Accountant (RWA Auditor). Income & expense statement.',
-      format: 'PDF',
-      size: '4.8 MB',
-      icon: <FileText className="w-5 h-5 text-teal-700" />,
+      title: 'Complaints Register',
+      desc: 'Ticket-wise complaint log with category, priority, and resolution status.',
+      icon: <AlertTriangle className="w-5 h-5 text-amber-600" />,
+      count: complaints.length,
+      onClick: () =>
+        handleExport(
+          complaints.map(c => ({
+            'Ticket #': c.ticketNumber,
+            Title: c.title,
+            Category: c.category,
+            Flat: c.flat,
+            Tower: c.tower,
+            Resident: c.residentName,
+            Priority: c.priority,
+            Status: c.status,
+            'Reported At': c.reportedAt,
+            'Assigned To': c.assignedTo?.name ?? '',
+          })),
+          'complaints.csv',
+          'Complaints',
+        ),
     },
     {
-      title: 'Complaint SLA & Vendor Performance Audit',
-      desc: 'Resolution timings across plumbing, lift, electrical, and housekeeping vendors.',
-      format: 'PDF',
-      size: '620 KB',
-      icon: <FileText className="w-5 h-5 text-amber-600" />,
+      title: 'All Bills',
+      desc: 'Complete maintenance billing ledger with line items and payment status.',
+      icon: <Receipt className="w-5 h-5 text-emerald-600" />,
+      count: bills.length,
+      onClick: () =>
+        handleExport(
+          bills.map(b => ({
+            'Bill #': b.billNumber,
+            Flat: b.flat,
+            Tower: b.tower,
+            Resident: b.residentName,
+            Month: b.month,
+            Year: b.year,
+            'Maintenance Fee': b.maintenanceFee,
+            'Parking Fee': b.parkingFee,
+            'Late Fee': b.lateFee,
+            'Total Amount': b.totalAmount,
+            Status: b.status,
+            'Due Date': b.dueDate,
+            'Paid At': b.paidAt ?? '',
+          })),
+          'bills.csv',
+          'Bills',
+        ),
     },
     {
-      title: 'Occupancy & Tenant Police Verification Roster',
-      desc: 'Current roster of 132 occupied flats with verified KYC documents and vehicle RFID tag IDs.',
-      format: 'Excel / CSV',
-      size: '210 KB',
-      icon: <FileSpreadsheet className="w-5 h-5 text-emerald-600" />,
+      title: 'Payments Received',
+      desc: 'Filtered list of all paid bills with payment method and transaction IDs.',
+      icon: <CreditCard className="w-5 h-5 text-violet-600" />,
+      count: bills.filter(b => b.status === 'Paid').length,
+      onClick: () =>
+        handleExport(
+          bills
+            .filter(b => b.status === 'Paid')
+            .map(b => ({
+              'Bill #': b.billNumber,
+              Flat: b.flat,
+              Tower: b.tower,
+              Resident: b.residentName,
+              'Total Amount': b.totalAmount,
+              'Paid At': b.paidAt ?? '',
+              'Payment Method': b.paymentMethod ?? '',
+              'Transaction ID': b.transactionId ?? '',
+            })),
+          'payments.csv',
+          'Payments',
+        ),
     },
   ];
 
@@ -49,7 +148,7 @@ export const AdminReports: React.FC = () => {
           Society Audit & Compliance Reports
         </h2>
         <p className="text-xs text-slate-500 mt-0.5">
-          Download certified reports for AGM meetings, tax filings, and committee audits
+          Export live Firestore data to CSV for AGM meetings, tax filings, and committee audits
         </p>
       </div>
 
@@ -71,14 +170,14 @@ export const AdminReports: React.FC = () => {
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-400 font-mono">
-                {rep.format} • {rep.size}
+                CSV • {rep.count} rows
               </span>
               <button
-                onClick={() => showToast('Report download coming soon')}
+                onClick={rep.onClick}
                 className="px-3 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white font-bold flex items-center gap-1.5 transition-colors"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download Report</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                <span>Export CSV</span>
               </button>
             </div>
           </div>
