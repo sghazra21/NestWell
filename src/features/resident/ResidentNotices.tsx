@@ -5,7 +5,7 @@ import { Modal } from '../../components/common/Modal';
 import { Bell, Calendar, ChevronRight, FileText, AlertCircle, Sparkles, Building } from 'lucide-react';
 
 export const ResidentNotices: React.FC = () => {
-  const { notices, currentSociety } = useApp();
+  const { notices, currentSociety, showToast } = useApp();
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
 
   const getNoticeIcon = (category: string) => {
@@ -115,7 +115,7 @@ export const ResidentNotices: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => alert('Notice attachment downloaded to device.')}
+                  onClick={() => showToast('Attachment download coming soon')}
                   className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100"
                 >
                   Download

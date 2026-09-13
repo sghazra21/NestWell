@@ -26,6 +26,7 @@ export const SecurityApp: React.FC = () => {
     securityCheckOut,
     inviteVisitor,
     approveVisitor,
+    showToast,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +65,7 @@ export const SecurityApp: React.FC = () => {
     if (found) {
       setScanResult(found);
     } else {
-      alert('QR Code not found in society registry. Please register as walk-in.');
+      showToast('QR Code not found. Please register as walk-in.');
     }
   };
 

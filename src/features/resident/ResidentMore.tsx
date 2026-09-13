@@ -25,6 +25,7 @@ export const ResidentMore: React.FC = () => {
     setIsElectionModalOpen,
     setIsPaymentsResearchOpen,
     setIsProfileCompletionOpen,
+    showToast,
   } = useApp();
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
@@ -155,7 +156,7 @@ export const ResidentMore: React.FC = () => {
             ))}
             <button
               onClick={() => {
-                alert('Add member form opened. Verification SMS will be sent to the contact.');
+                showToast('Family management coming soon');
                 setActiveModal(null);
               }}
               className="w-full h-12 rounded-xl border border-teal-700 text-teal-700 font-bold text-sm hover:bg-teal-50"

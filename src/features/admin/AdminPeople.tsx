@@ -709,7 +709,7 @@ export const AdminPeople: React.FC = () => {
             <div className="pt-4 border-t border-slate-200 flex gap-3">
               <button
                 onClick={() => {
-                  alert(`Maintenance reminder SMS and WhatsApp sent to ${selectedResident.name}.`);
+                  showToast(`Maintenance reminder SMS and WhatsApp sent to ${selectedResident.name}.`);
                 }}
                 className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
               >

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const AdminVisitors: React.FC = () => {
-  const { visitors, updateVisitorStatus } = useApp();
+  const { visitors, updateVisitorStatus, showToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'inside' | 'expected' | 'exited'>('all');
@@ -47,7 +47,7 @@ export const AdminVisitors: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => alert('Exporting visitor entry logs (CSV format)...')}
+            onClick={() => showToast('CSV export coming soon')}
             className="h-10 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5"
           >
             <Download className="w-4 h-4 text-slate-500" />

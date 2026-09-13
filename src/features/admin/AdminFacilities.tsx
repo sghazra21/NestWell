@@ -4,7 +4,7 @@ import { Facility } from '../../types';
 import { Building2, Users, Calendar, Clock, Plus, CheckCircle2, Ban } from 'lucide-react';
 
 export const AdminFacilities: React.FC = () => {
-  const { facilities, bookFacilitySlot, currentSociety } = useApp();
+  const { facilities, bookFacilitySlot, currentSociety, showToast } = useApp();
 
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [selectedDay, setSelectedDay] = useState<'Saturday' | 'Sunday' | 'Next Monday'>('Saturday');
@@ -47,7 +47,7 @@ export const AdminFacilities: React.FC = () => {
         </div>
 
         <button
-          onClick={() => alert('Maintenance block modal opened. You can lock slots for repairs or cleaning.')}
+          onClick={() => showToast('Maintenance block feature coming soon')}
           className="h-10 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold flex items-center gap-2"
         >
           <Ban className="w-4 h-4 text-slate-500" />

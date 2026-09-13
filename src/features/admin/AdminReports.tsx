@@ -1,7 +1,9 @@
 import React from 'react';
+import { useApp } from '../../context/AppContext';
 import { Download, FileText, FileSpreadsheet, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 export const AdminReports: React.FC = () => {
+  const { showToast } = useApp();
   const reports = [
     {
       title: 'September 2024 Maintenance Ledger',
@@ -72,7 +74,7 @@ export const AdminReports: React.FC = () => {
                 {rep.format} • {rep.size}
               </span>
               <button
-                onClick={() => alert(`Downloading "${rep.title}"...`)}
+                onClick={() => showToast('Report download coming soon')}
                 className="px-3 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white font-bold flex items-center gap-1.5 transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />

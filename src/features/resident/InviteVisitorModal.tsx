@@ -11,7 +11,7 @@ interface InviteVisitorModalProps {
 }
 
 export const InviteVisitorModal: React.FC<InviteVisitorModalProps> = ({ isOpen, onClose }) => {
-  const { inviteVisitor, cancelVisitorPass, resident, currentSociety } = useApp();
+  const { inviteVisitor, cancelVisitorPass, resident, currentSociety, showToast } = useApp();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -267,7 +267,7 @@ export const InviteVisitorModal: React.FC<InviteVisitorModalProps> = ({ isOpen, 
               id="share-pass-btn"
               type="button"
               onClick={() => {
-                alert(`Pass #${generatedPass.passNumber} copied! You can share this via WhatsApp or SMS.`);
+                showToast('Share feature coming soon');
               }}
               className="h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm"
             >

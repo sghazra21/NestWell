@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const AdminFinance: React.FC = () => {
-  const { bills, markBillPaidManually } = useApp();
+  const { bills, markBillPaidManually, showToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Overdue' | 'Due'>('all');
@@ -38,8 +38,7 @@ export const AdminFinance: React.FC = () => {
   });
 
   const handleSendBulkReminders = () => {
-    const pendingCount = bills.filter((b) => b.status !== 'Paid').length;
-    alert(`Automated WhatsApp & SMS reminders dispatched to ${pendingCount} flat owners with pending dues.`);
+    showToast('Bulk reminders feature coming soon');
   };
 
   return (
@@ -65,7 +64,7 @@ export const AdminFinance: React.FC = () => {
           </button>
 
           <button
-            onClick={() => alert('Exporting society ledger to Excel / CSV...')}
+            onClick={() => showToast('Export feature coming soon')}
             className="h-10 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -208,7 +207,7 @@ export const AdminFinance: React.FC = () => {
                       </button>
                     ) : (
                       <button
-                        onClick={() => alert(`Receipt for bill ${b.billNumber}${b.transactionId ? ` • ${b.transactionId}` : ''}.`)}
+                        onClick={() => showToast('Receipt view coming soon')}
                         className="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
                       >
                         Receipt
