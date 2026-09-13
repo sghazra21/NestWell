@@ -169,7 +169,9 @@ service cloud.firestore {
         allow create: if (isSocietyMember(societyId)
           && request.resource.data.status == 'pending')
           || isSocietyAdmin(societyId);
-        allow update, delete: if false;
+        // Delete allowed for admins (void/correction + society wipe).
+        allow delete: if isSocietyAdmin(societyId);
+        allow update: if false;
       }
 
       match /facilities/{facilityId} {
@@ -210,21 +212,28 @@ service cloud.firestore {
           allow read: if isSocietyMember(societyId);
           // One vote per voter enforced by deterministic doc ID.
           allow create: if isSocietyMember(societyId);
-          allow update, delete: if false;
+          allow update: if false;
+          // Platform admin only (society wipe). Ballots are otherwise immutable.
+          allow delete: if isPlatformAdmin();
         }
       }
 
       match /auditLogs/{logId} {
         allow read: if isSocietyAdmin(societyId);
         allow create: if isSignedIn();
-        allow update, delete: if false;
+        allow update: if false;
+        // Platform admin only (society wipe). Audit trail is otherwise immutable.
+        allow delete: if isPlatformAdmin();
       }
     }
 
     // ---------- Platform Analytics (derived, backend-written) ----------
     match /platformAnalytics/{societyId} {
       allow read: if isPlatformAdmin() || isSocietyAdmin(societyId);
-      allow write: if false;
+      allow update: if false;
+      // Platform admin only (society wipe).
+      allow delete: if isPlatformAdmin();
+      allow create: if false;
     }
 
     // ---------- Support Sessions ----------
