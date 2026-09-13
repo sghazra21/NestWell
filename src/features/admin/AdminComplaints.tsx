@@ -63,7 +63,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
 
   const handleAssign = (staff: { name: string; role: string; phone: string }) => {
     if (!inspectComplaint) return;
-    assignComplaint(inspectComplaint.id, staff);
+    assignComplaint(inspectComplaint.id, staff.name, staff.role, staff.phone);
     setInspectComplaint((prev) =>
       prev ? { ...prev, assignedTo: staff, status: 'assigned' } : null
     );
