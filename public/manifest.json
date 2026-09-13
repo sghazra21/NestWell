@@ -1,0 +1,14 @@
+{
+  "name": "NestWell - Society Management",
+  "short_name": "NestWell",
+  "description": "Multi-tenant society management platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/branding/app-icons/NestWell_icon_192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/branding/app-icons/NestWell_icon_512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
