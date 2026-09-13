@@ -163,7 +163,7 @@ export const AdminFinance: React.FC = () => {
 
           <button
             onClick={handleSendBulkReminders}
-            className="h-10 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
+            className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Send Bulk Reminders</span>
@@ -262,7 +262,7 @@ export const AdminFinance: React.FC = () => {
                   <select
                     value={item.type}
                     onChange={(e) => handleLineItemChange(index, 'type', e.target.value)}
-                    className="h-9 w-32 px-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-700"
+                    className="h-10 w-32 px-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-700"
                   >
                     <option value="maintenance">Maintenance</option>
                     <option value="parking">Parking</option>
@@ -276,19 +276,19 @@ export const AdminFinance: React.FC = () => {
                     value={item.description}
                     onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
                     placeholder="Description"
-                    className="flex-1 h-9 px-3 rounded-lg border border-slate-200 text-xs font-medium text-slate-800"
+                    className="flex-1 h-10 px-3 rounded-lg border border-slate-200 text-xs font-medium text-slate-800"
                   />
                   <input
                     type="number"
                     value={item.amount || ''}
                     onChange={(e) => handleLineItemChange(index, 'amount', Number(e.target.value))}
                     placeholder="₹0"
-                    className="h-9 w-28 px-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-800"
+                    className="h-10 w-28 px-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-800"
                   />
                   {lineItems.length > 1 && (
                     <button
                       onClick={() => handleRemoveLineItem(index)}
-                      className="h-9 w-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="h-10 w-10 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -309,13 +309,13 @@ export const AdminFinance: React.FC = () => {
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               onClick={() => setIsCreateBillOpen(false)}
-              className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+              className="h-10 px-4 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleCreateBill}
-              className="h-9 px-5 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold shadow-sm transition-colors"
+              className="h-10 px-5 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold shadow-sm transition-colors"
             >
               Create & Issue Bill
             </button>
@@ -325,7 +325,7 @@ export const AdminFinance: React.FC = () => {
 
       {/* 3 Large KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Total Billed ({currentBillingPeriod})
           </span>
@@ -337,7 +337,7 @@ export const AdminFinance: React.FC = () => {
           </span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Total Collected
           </span>
@@ -349,7 +349,7 @@ export const AdminFinance: React.FC = () => {
           </span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Overdue / Pending
           </span>
@@ -363,7 +363,7 @@ export const AdminFinance: React.FC = () => {
       </div>
 
       {/* Filter and search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -382,7 +382,7 @@ export const AdminFinance: React.FC = () => {
               onClick={() => setStatusFilter(status)}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 statusFilter === status
-                  ? 'bg-teal-700 text-white'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -559,7 +559,7 @@ export const AdminFinance: React.FC = () => {
               </button>
               <button
                 onClick={handleRecordPayment}
-                className="h-10 px-5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-2"
+                className="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-2"
               >
                 <Receipt className="w-3.5 h-3.5" />
                 <span>Record Payment</span>

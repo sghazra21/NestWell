@@ -14,6 +14,7 @@ export const AdminFacilities: React.FC = () => {
   if (currentSociety?.features?.facilityBooking === false) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-2">
+        <Building2 className="w-14 h-14 text-slate-200 mx-auto mb-4" />
         <h2 className="text-lg font-extrabold text-slate-900">Facility booking is not enabled</h2>
         <p className="text-xs text-slate-500 max-w-sm mx-auto">
           This society was provisioned without the facility module. A Society Admin can enable it from Society Settings.
@@ -25,6 +26,7 @@ export const AdminFacilities: React.FC = () => {
   if (facilities.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-2">
+        <Building2 className="w-14 h-14 text-slate-200 mx-auto mb-4" />
         <h2 className="text-lg font-extrabold text-slate-900">No facilities configured yet</h2>
         <p className="text-xs text-slate-500 max-w-sm mx-auto">
           Add amenities (clubhouse, courts, halls) during society onboarding or from Society Settings to enable bookings.

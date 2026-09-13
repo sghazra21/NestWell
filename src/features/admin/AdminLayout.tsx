@@ -200,7 +200,7 @@ export const AdminLayout: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -220,7 +220,7 @@ export const AdminLayout: React.FC = () => {
                   setIsMobileMenuOpen(false);
                   setViewMode('resident');
                 }}
-                className="w-full h-8.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs"
               >
                 <Eye className="w-3.5 h-3.5" />
                 <span>Switch to Resident View</span>
@@ -336,7 +336,7 @@ export const AdminLayout: React.FC = () => {
             <button
               id="admin-switch-to-resident-sidebar-btn"
               onClick={() => setViewMode('resident')}
-              className="w-full h-8.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" />
               <span>View as Resident</span>

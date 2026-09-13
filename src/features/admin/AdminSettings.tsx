@@ -368,7 +368,7 @@ export const AdminSettings: React.FC = () => {
           <button
             type="submit"
             disabled={isSaving}
-            className="h-12 px-6 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+            className="h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
             <span>{isSaving ? 'Saving...' : 'Save Society Settings'}</span>

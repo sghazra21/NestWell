@@ -90,7 +90,7 @@ export const AdminNotices: React.FC = () => {
         <button
           id="publish-notice-btn"
           onClick={() => setIsCreateModalOpen(true)}
-          className="h-10 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
+          className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>Publish New Notice</span>
@@ -110,7 +110,7 @@ export const AdminNotices: React.FC = () => {
         ) : notices.map((n) => (
           <div
             key={n.id}
-            className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3"
+            className="p-6 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3"
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -271,7 +271,7 @@ export const AdminNotices: React.FC = () => {
           <button
             type="submit"
             disabled={uploading}
-            className="w-full h-13 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm rounded-xl mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-13 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploading ? (
               <>

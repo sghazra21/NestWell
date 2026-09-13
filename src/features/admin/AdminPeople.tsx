@@ -196,7 +196,7 @@ export const AdminPeople: React.FC = () => {
           <button
             id="add-resident-btn"
             onClick={() => setIsAddModalOpen(true)}
-            className="h-10 px-3.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-colors"
+            className="h-10 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Add Resident</span>
@@ -243,7 +243,7 @@ export const AdminPeople: React.FC = () => {
                   </p>
                   <button
                     onClick={() => setActiveTab('residents')}
-                    className="px-4 py-2 rounded-xl bg-teal-700 text-white font-bold text-xs"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs"
                   >
                     View Society Residents List
                   </button>
@@ -410,7 +410,7 @@ export const AdminPeople: React.FC = () => {
       ) : (
         <>
           {/* Filter and search toolbar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -534,7 +534,7 @@ export const AdminPeople: React.FC = () => {
                           {r.societyRole !== 'admin' ? (
                             <button
                               onClick={() => handlePromote(r.id, 'admin', 'Society Admin & Executive Officer')}
-                              className="text-xs font-bold text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg border border-purple-200 transition-all flex items-center gap-1"
+                              className="h-10 text-xs font-bold text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-700 px-2.5 py-1.5 rounded-lg border border-purple-200 transition-all flex items-center gap-1"
                               title="Grant this resident full society admin powers"
                             >
                               <ShieldCheck className="w-3.5 h-3.5" />
@@ -548,7 +548,7 @@ export const AdminPeople: React.FC = () => {
 
                           <button
                             onClick={() => setSelectedResident(r)}
-                            className="text-xs font-bold text-teal-700 hover:text-teal-900 px-2.5 py-1.5 rounded-lg border border-teal-200 hover:bg-teal-50"
+                            className="h-10 text-xs font-bold text-teal-700 hover:text-teal-900 px-2.5 py-1.5 rounded-lg border border-teal-200 hover:bg-teal-50"
                           >
                             Details
                           </button>
@@ -721,7 +721,7 @@ export const AdminPeople: React.FC = () => {
                 onClick={() => {
                   showToast(`Maintenance reminder SMS and WhatsApp sent to ${selectedResident.name}.`);
                 }}
-                className="flex-1 h-11 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
+                className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
               >
                 <Phone className="w-4 h-4" />
                 <span>Send WhatsApp Due Notice</span>

@@ -93,7 +93,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -305,7 +305,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
                 <button
                   onClick={() => handleAssign(staffName, staffRole, staffPhone)}
                   disabled={!staffName.trim()}
-                  className="h-10 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Assign Staff
                 </button>
