@@ -1180,6 +1180,35 @@ export async function submitNominationRecord(
   }
 }
 
+export async function updateElectionRecord(
+  societyId: string,
+  electionId: string,
+  updates: Partial<Election>
+): Promise<void> {
+  const path = `societies/${societyId}/elections/${electionId}`;
+  try {
+    const clean = sanitizeFirestoreData(updates);
+    await updateDoc(doc(db, 'societies', societyId, 'elections', electionId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function updateNominationRecord(
+  societyId: string,
+  electionId: string,
+  nominationId: string,
+  updates: Partial<Nomination>
+): Promise<void> {
+  const path = `societies/${societyId}/elections/${electionId}/nominations/${nominationId}`;
+  try {
+    const clean = sanitizeFirestoreData(updates);
+    await updateDoc(doc(db, 'societies', societyId, 'elections', electionId, 'nominations', nominationId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
 export function subscribeVotes(societyId: string, electionId: string, callback: (votes: Vote[]) => void) {
   const path = `societies/${societyId}/elections/${electionId}/votes`;
   return onSnapshot(

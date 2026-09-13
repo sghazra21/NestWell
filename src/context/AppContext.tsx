@@ -72,8 +72,10 @@ import {
   createNoticeRecord,
   subscribeElections,
   createElectionRecord,
+  updateElectionRecord,
   subscribeNominations,
   submitNominationRecord,
+  updateNominationRecord,
   subscribeVotes,
   castVoteRecord,
   subscribeAuditLogs,
@@ -206,7 +208,7 @@ interface AppContextType {
   submitNomination: (
     data: Omit<Nomination, 'id' | 'status' | 'voteCount' | 'nominatedAt'>
   ) => Promise<void>;
-  updateNominationStatus: (id: string, status: Nomination['status']) => Promise<void>;
+  updateNominationStatus: (electionId: string, nominationId: string, status: Nomination['status']) => Promise<void>;
   createElection: (
     data: Omit<Election, 'id' | 'totalVotesCast' | 'createdAt'>
   ) => Promise<void>;
@@ -1023,6 +1025,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : c
       )
     );
+    updateComplaintStatusRecord(currentSocietyId, id, 'assigned').catch((err) =>
+      console.warn('Firestore complaint assign error:', err)
+    );
     showToast(`Assigned ticket to technician ${name}.`);
   };
 
@@ -1251,8 +1256,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Nomination filed successfully. Under Committee Review.');
   };
 
-  const updateNominationStatus = async (id: string, status: Nomination['status']) => {
-    setNominations((prev) => prev.map((n) => (n.id === id ? { ...n, status } : n)));
+  const updateNominationStatus = async (electionId: string, nominationId: string, status: Nomination['status']) => {
+    setNominations((prev) => prev.map((n) => (n.id === nominationId ? { ...n, status } : n)));
+    updateNominationRecord(currentSocietyId, electionId, nominationId, { status }).catch((err) =>
+      console.warn('Firestore nomination update error:', err)
+    );
     showToast(`Nomination status updated to ${status}.`);
   };
 
@@ -1265,6 +1273,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateElectionStatus = async (id: string, status: Election['status']) => {
     setElections((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
+    updateElectionRecord(currentSocietyId, id, { status }).catch((err) =>
+      console.warn('Firestore election update error:', err)
+    );
     showToast(`Election status updated to ${status}.`);
   };
 

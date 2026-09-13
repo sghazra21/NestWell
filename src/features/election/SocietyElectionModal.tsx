@@ -681,7 +681,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                       <div className="flex items-center gap-2">
                         {nom.status !== 'Approved' && (
                           <button
-                            onClick={() => updateNominationStatus(nom.id, 'Approved')}
+                            onClick={() => updateNominationStatus(currentElection.id, nom.id, 'Approved')}
                             className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-[11px] hover:bg-emerald-100"
                           >
                             Approve
@@ -689,7 +689,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                         )}
                         {nom.status !== 'Rejected' && (
                           <button
-                            onClick={() => updateNominationStatus(nom.id, 'Rejected')}
+                            onClick={() => updateNominationStatus(currentElection.id, nom.id, 'Rejected')}
                             className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded-lg font-bold text-[11px] hover:bg-red-100"
                           >
                             Reject
