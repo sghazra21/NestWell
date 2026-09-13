@@ -72,7 +72,9 @@ export const AdminLayout: React.FC = () => {
       icon: <CreditCard className="w-5 h-5" />,
       badge: overdueBillsCount > 0 ? `${overdueBillsCount}` : undefined,
     },
-    { id: 'facilities', label: 'Facilities', icon: <Building2 className="w-5 h-5" /> },
+    ...(currentSociety?.features?.facilityBooking !== false
+      ? [{ id: 'facilities', label: 'Facilities', icon: <Building2 className="w-5 h-5" /> }]
+      : []),
     { id: 'notices', label: 'Notices', icon: <Bell className="w-5 h-5" /> },
     { id: 'reports', label: 'Reports', icon: <FileSpreadsheet className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },

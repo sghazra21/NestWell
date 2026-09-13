@@ -4,10 +4,34 @@ import { Facility } from '../../types';
 import { Building2, Users, Calendar, Clock, Plus, CheckCircle2, Ban } from 'lucide-react';
 
 export const AdminFacilities: React.FC = () => {
-  const { facilities, bookFacilitySlot } = useApp();
+  const { facilities, bookFacilitySlot, currentSociety } = useApp();
 
-  const [selectedFacility, setSelectedFacility] = useState<Facility>(facilities[0]);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [selectedDay, setSelectedDay] = useState<'Saturday' | 'Sunday' | 'Next Monday'>('Saturday');
+
+  const activeFacility = selectedFacility || facilities[0];
+
+  if (currentSociety?.features?.facilityBooking === false) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-2">
+        <h2 className="text-lg font-extrabold text-slate-900">Facility booking is not enabled</h2>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          This society was provisioned without the facility module. A Society Admin can enable it from Society Settings.
+        </p>
+      </div>
+    );
+  }
+
+  if (facilities.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-2">
+        <h2 className="text-lg font-extrabold text-slate-900">No facilities configured yet</h2>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          Add amenities (clubhouse, courts, halls) during society onboarding or from Society Settings to enable bookings.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -34,7 +58,7 @@ export const AdminFacilities: React.FC = () => {
       {/* Facilities Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {facilities.map((fac) => {
-          const isSelected = selectedFacility.id === fac.id;
+          const isSelected = activeFacility.id === fac.id;
           return (
             <div
               key={fac.id}
@@ -55,7 +79,7 @@ export const AdminFacilities: React.FC = () => {
               <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-500">
                 <span>Capacity: {fac.capacity}</span>
                 <span className="font-bold text-teal-700">
-                  {fac.slots.filter((s) => s.status === 'Available').length} slots free
+                  {(fac.slots || []).filter((s) => s.status === 'Available').length} slots free
                 </span>
               </div>
             </div>
@@ -68,7 +92,7 @@ export const AdminFacilities: React.FC = () => {
         <div className="flex items-center justify-between border-b pb-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900">
-              {selectedFacility.name} — Schedule & Slots
+              {activeFacility.name} — Schedule & Slots
             </h3>
             <p className="text-xs text-slate-500">Hourly slots management</p>
           </div>
@@ -91,7 +115,12 @@ export const AdminFacilities: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {selectedFacility.slots.map((slot) => {
+          {(activeFacility.slots || []).length === 0 ? (
+            <p className="text-xs text-slate-400 col-span-full text-center py-4">
+              No slots defined for {activeFacility.name} yet.
+            </p>
+          ) : (
+            (activeFacility.slots || []).map((slot) => {
             const isBooked = slot.status === 'Booked';
 
             return (
@@ -128,7 +157,8 @@ export const AdminFacilities: React.FC = () => {
                 </span>
               </div>
             );
-          })}
+          })
+          )}
         </div>
       </div>
     </div>
