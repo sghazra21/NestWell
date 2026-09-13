@@ -1010,6 +1010,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Firestore visitor error:', err)
     );
 
+    // Create notification for the resident
+    if (user?.uid) {
+      createNotificationRecord(currentSocietyId, {
+        societyId: currentSocietyId,
+        userId: user.uid,
+        type: 'visitor_arrived',
+        title: 'Visitor Expected',
+        message: `${data.name} is expected on ${data.expectedDate} at ${data.expectedTime}.`,
+        read: false,
+        relatedEntityType: 'visitor',
+        relatedEntityId: '',
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
+
     showToast(`Visitor pass created for ${data.name}.`);
     return tempVisitor;
   };
@@ -1034,6 +1049,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateVisitorStatus(id, 'inside');
     setGateAlert({ active: false });
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+    // Notify the resident whose visitor was approved
+    if (user?.uid) {
+      createNotificationRecord(currentSocietyId, {
+        societyId: currentSocietyId,
+        userId: user.uid,
+        type: 'visitor_approved',
+        title: 'Visitor Approved',
+        message: `${visitor.name} has been approved and granted entry.`,
+        read: false,
+        relatedEntityType: 'visitor',
+        relatedEntityId: visitor.id,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
     showToast(`Approved! Barrier gate opened for ${visitor.name}.`);
   };
 
@@ -1131,12 +1160,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateComplaintStatus = (id: string, status: ComplaintStatus) => {
+    const complaint = complaints.find((c) => c.id === id);
     setComplaints((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status } : c))
     );
     updateComplaintStatusRecord(currentSocietyId, id, status).catch((err) =>
       console.warn('Firestore complaint update error:', err)
     );
+    // Notify the complaint reporter
+    if (complaint) {
+      createNotificationRecord(currentSocietyId, {
+        societyId: currentSocietyId,
+        userId: user?.uid || '',
+        type: 'complaint_update',
+        title: 'Complaint Updated',
+        message: `Your complaint "${complaint.title}" (#${complaint.ticketNumber}) status changed to ${status}.`,
+        read: false,
+        relatedEntityType: 'complaint',
+        relatedEntityId: id,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
     showToast(`Complaint status updated to ${status}.`);
   };
 
@@ -1295,6 +1339,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reason: `Verified UPI payment of ₹${payment.amount} for bill ${payment.paymentReference}`,
     });
 
+    // Notify the resident about payment verification
+    createNotificationRecord(currentSocietyId, {
+      societyId: currentSocietyId,
+      userId: payment.residentId,
+      type: 'payment_verified',
+      title: 'Payment Verified',
+      message: `Your payment of ₹${payment.amount} for ${payment.paymentReference} has been verified.`,
+      read: false,
+      relatedEntityType: 'payment',
+      relatedEntityId: paymentId,
+      createdAt: new Date().toISOString(),
+    }).catch(() => {});
+
     showToast('Payment verified and bill marked as Paid.');
   };
 
@@ -1317,6 +1374,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetId: paymentId,
       reason: `Rejected payment: ${reason}`,
     });
+
+    // Notify the resident about payment rejection
+    if (payment) {
+      createNotificationRecord(currentSocietyId, {
+        societyId: currentSocietyId,
+        userId: payment.residentId,
+        type: 'payment_rejected',
+        title: 'Payment Rejected',
+        message: `Your payment of ₹${payment.amount} for ${payment.paymentReference} was rejected. Reason: ${reason}`,
+        read: false,
+        relatedEntityType: 'payment',
+        relatedEntityId: paymentId,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     showToast('Payment rejected. Resident will be notified.');
   };
@@ -1381,6 +1453,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetId: newBill.id,
       reason: `Bill created for Flat ${flatNumber} — ${billingPeriod} — ₹${amount.toLocaleString()}`,
     });
+    // Notify the resident about the new bill
+    createNotificationRecord(currentSocietyId, {
+      societyId: currentSocietyId,
+      userId: user?.uid || '',
+      type: 'bill_generated',
+      title: 'New Bill Generated',
+      message: `Bill for Flat ${flatNumber} — ${billingPeriod} — ₹${amount.toLocaleString()} is due by ${dueDate}.`,
+      read: false,
+      relatedEntityType: 'bill',
+      relatedEntityId: newBill.id,
+      createdAt: new Date().toISOString(),
+    }).catch(() => {});
     showToast(`Bill created for Flat ${flatNumber} — ${billingPeriod}`);
     return newBill.id;
   };
@@ -1397,6 +1481,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timeSlot: slotTime,
       totalCost: fac?.pricePerHour || 0,
     }).catch((err) => console.warn('Firestore booking error:', err));
+
+    // Notify the resident about the booking
+    if (user?.uid) {
+      createNotificationRecord(currentSocietyId, {
+        societyId: currentSocietyId,
+        userId: user.uid,
+        type: 'booking_confirmed',
+        title: 'Booking Confirmed',
+        message: `${fac?.name || 'Facility'} booked for ${date} at ${slotTime}.`,
+        read: false,
+        relatedEntityType: 'facilityBooking',
+        relatedEntityId: facilityId,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     showToast(`Booking confirmed for ${fac?.name || 'Facility'} at ${slotTime}.`);
     return true;
@@ -1436,6 +1535,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createNoticeRecord(currentSocietyId, newNoticeData).catch((err) =>
       console.warn('Firestore notice error:', err)
     );
+
+    // Notify all members about the new notice
+    if (user?.uid) {
+      createNotificationRecord(currentSocietyId, {
+        societyId: currentSocietyId,
+        userId: user.uid,
+        type: 'notice_published',
+        title: 'New Notice Published',
+        message: `"${data.title}" — ${data.message.substring(0, 100)}${data.message.length > 100 ? '...' : ''}`,
+        read: false,
+        relatedEntityType: 'notice',
+        relatedEntityId: tempNotice.id,
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     showToast('Community notice broadcast to all residents.');
     return tempNotice;

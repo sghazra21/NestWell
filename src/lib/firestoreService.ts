@@ -323,6 +323,7 @@ const SOCIETY_SUBCOLLECTIONS = [
   'notices',
   'elections',
   'auditLogs',
+  'notifications',
 ];
 
 /**

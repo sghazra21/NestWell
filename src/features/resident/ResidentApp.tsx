@@ -25,6 +25,19 @@ export const ResidentApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-slate-900 flex flex-col antialiased">
+      {/* Top Header Bar */}
+      <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-30 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-indigo-600 rounded-xl flex items-center justify-center shadow-xs text-white">
+            <Building2 className="w-3.5 h-3.5" />
+          </div>
+          <span className="font-bold text-sm tracking-tight text-slate-900">NestWell</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+        </div>
+      </header>
+
       {/* Admin return banner: Shown to admins viewing resident portal */}
       {canAccessAdminView && (
         <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between text-xs sticky top-0 z-50 shadow-md">

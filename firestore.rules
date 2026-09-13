@@ -226,6 +226,13 @@ service cloud.firestore {
         // Platform admin only (society wipe). Audit trail is otherwise immutable.
         allow delete: if isPlatformAdmin();
       }
+
+      match /notifications/{notificationId} {
+        allow read: if request.auth.uid == resource.data.userId;
+        allow create: if isSocietyAdmin(societyId);
+        allow update: if request.auth.uid == resource.data.userId;
+        allow delete: if false;
+      }
     }
 
     // ---------- Platform Analytics (derived, backend-written) ----------
