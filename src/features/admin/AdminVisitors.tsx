@@ -125,9 +125,13 @@ export const AdminVisitors: React.FC = () => {
               {filteredVisitors.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-12 text-center">
-                    <ShieldCheck className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-slate-700">No visitors</p>
-                    <p className="text-xs text-slate-400 mt-1">No visitor passes match your current filters.</p>
+                    <ShieldCheck className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-900">No visitors found</h3>
+                    <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                      {searchQuery || statusFilter !== 'all'
+                        ? 'No visitor passes match your current filters. Try adjusting your search or filter criteria.'
+                        : 'No visitors have been registered yet. Visitor passes created by residents will appear here.'}
+                    </p>
                   </td>
                 </tr>
               ) : filteredVisitors.map((v) => (

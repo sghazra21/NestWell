@@ -26,6 +26,7 @@ export const SecurityApp: React.FC = () => {
     securityCheckOut,
     inviteVisitor,
     approveVisitor,
+    currentSociety,
     showToast,
   } = useApp();
 
@@ -100,7 +101,7 @@ export const SecurityApp: React.FC = () => {
               <Shield className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Security Gate 1 (Main Gate)</h1>
+              <h1 className="text-lg font-bold tracking-tight">{currentSociety?.gates?.[0]?.name || 'Security Gate'}</h1>
               <p className="text-xs text-slate-400">On-Duty Guard</p>
             </div>
           </div>
@@ -195,8 +196,15 @@ export const SecurityApp: React.FC = () => {
         <div className="space-y-3">
           {filteredVisitors.length === 0 ? (
             <div className="p-8 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <p className="text-sm font-bold text-slate-600">No matching entries found</p>
-              <p className="text-xs text-slate-400 mt-1">Try another search or register a walk-in visitor.</p>
+              <Shield className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-slate-900">
+                {searchQuery ? 'No matching entries found' : 'No visitors yet'}
+              </h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                {searchQuery
+                  ? 'No visitor passes match your search. Try a different query or register a walk-in.'
+                  : 'No visitors have been registered. Use the scanner or register a walk-in visitor above.'}
+              </p>
             </div>
           ) : (
             filteredVisitors.map((vis) => {
@@ -298,7 +306,7 @@ export const SecurityApp: React.FC = () => {
       <Modal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
-        title="Gate 1 Camera Scanner"
+        title={`${currentSociety?.gates?.[0]?.name || 'Security Gate'} Camera Scanner`}
         subtitle="Point tablet camera at visitor QR pass"
         maxWidth="sm"
       >
@@ -383,7 +391,7 @@ export const SecurityApp: React.FC = () => {
         isOpen={isWalkInOpen}
         onClose={() => setIsWalkInOpen(false)}
         title="Walk-in Visitor Registration"
-        subtitle="Security Gate 1 Entry Log"
+        subtitle={`${currentSociety?.gates?.[0]?.name || 'Security Gate'} Entry Log`}
         maxWidth="sm"
       >
         <form onSubmit={handleWalkInSubmit} className="space-y-4">

@@ -101,9 +101,11 @@ export const AdminNotices: React.FC = () => {
       <div className="space-y-3">
         {notices.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-            <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-700">No notices</p>
-            <p className="text-xs text-slate-400 mt-1">Publish your first notice to the community.</p>
+            <Bell className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-900">No notices yet</h3>
+            <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+              Publish your first notice to broadcast circulars, events, or urgent updates to the community.
+            </p>
           </div>
         ) : notices.map((n) => (
           <div

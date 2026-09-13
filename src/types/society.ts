@@ -30,6 +30,18 @@ export interface Society {
   registeredNumber?: string;
   totalFlats?: number;
   totalResidents?: number;
+  gates?: Array<{ id: string; name: string; active: boolean }>;
+  contact?: { email: string; phone: string };
+  emergencyContacts?: {
+    security: string;
+    manager: string;
+    electrician: string;
+    plumber: string;
+    police: string;
+    ambulance: string;
+  };
+  billing?: { currency: string; defaultDueDay: number };
+  payment?: { upiId: string; payeeName: string };
   createdAt: string;
   createdBy: string;
   activatedAt?: string;

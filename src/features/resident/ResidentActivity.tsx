@@ -51,9 +51,11 @@ export const ResidentActivity: React.FC = () => {
         <div className="space-y-3">
           {residentVisitors.length === 0 ? (
             <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-              <User className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700">No active visitor passes</p>
-              <p className="text-xs text-slate-400 mt-1">Use "Invite Visitor" from Home to create one.</p>
+              <User className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-slate-900">No visitor passes</h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                Use "Invite Visitor" from Home to create a digital gate pass for your guests.
+              </p>
             </div>
           ) : (
             residentVisitors.map((vis) => {
@@ -131,9 +133,11 @@ export const ResidentActivity: React.FC = () => {
         <div className="space-y-3">
           {residentComplaints.length === 0 ? (
             <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-              <Wrench className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm font-bold text-slate-700">No complaints</p>
-              <p className="text-xs text-slate-400 mt-1">Report a problem from Home to get started.</p>
+              <Wrench className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-slate-900">No complaints yet</h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                Report a maintenance issue from Home to get started. Your tickets will appear here.
+              </p>
             </div>
           ) : residentComplaints.map((comp) => (
             <div

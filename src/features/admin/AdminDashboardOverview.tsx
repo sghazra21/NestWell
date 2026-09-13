@@ -108,7 +108,9 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           <div className="text-sm font-medium text-slate-500 mb-2">Gate Activity</div>
           <div className="text-3xl font-bold text-indigo-700">{visitorsInside} Visitors</div>
           <div className="mt-2 text-xs text-emerald-600 font-medium">
-            Gate 1 & 2 Online
+            {currentSociety?.gates
+              ? currentSociety.gates.filter(g => g.active).map(g => g.name).join(' & ') || 'No gates configured'
+              : 'Gates configured'}
           </div>
         </div>
       </div>

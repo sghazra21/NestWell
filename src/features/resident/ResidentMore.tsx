@@ -229,10 +229,13 @@ export const ResidentMore: React.FC = () => {
         >
           <div className="space-y-2.5">
             {[
-              { name: 'Security Gate', phone: '+911234567890', message: `Emergency help needed at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
-              { name: 'Police', phone: '100', message: `Police emergency at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
-              { name: 'Ambulance', phone: '108', message: `Medical emergency at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
-            ].map((contact) => (
+              { name: 'Security Gate', phone: currentSociety?.emergencyContacts?.security || '+911234567890', message: `Emergency help needed at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Manager', phone: currentSociety?.emergencyContacts?.manager || '', message: `Emergency help needed at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Electrician', phone: currentSociety?.emergencyContacts?.electrician || '', message: `Electrical issue at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Plumber', phone: currentSociety?.emergencyContacts?.plumber || '', message: `Plumbing issue at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Police', phone: currentSociety?.emergencyContacts?.police || '100', message: `Police emergency at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+              { name: 'Ambulance', phone: currentSociety?.emergencyContacts?.ambulance || '108', message: `Medical emergency at ${currentSociety?.name || 'Society'}, Flat ${resident.flat}` },
+            ].filter((c) => c.phone).map((contact) => (
               <div key={contact.name} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                 <div>
                   <h5 className="text-sm font-bold text-slate-900">{contact.name}</h5>

@@ -31,8 +31,8 @@ export const IndianPaymentsResearchModal: React.FC<IndianPaymentsResearchModalPr
 
   if (!isOpen) return null;
 
-  const upiVpa = '';
-  const payeeName = currentSociety?.name || 'Society';
+  const upiVpa = currentSociety?.payment?.upiId || '';
+  const payeeName = currentSociety?.payment?.payeeName || currentSociety?.name || 'Society';
   const transactionNote = `Maintenance_${testFlat}`;
   const upiIntentUri = upiVpa
     ? `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(

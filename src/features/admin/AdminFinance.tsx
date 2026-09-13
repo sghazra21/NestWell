@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MaintenanceBill, BillLineItem } from '../../types';
+import { Modal } from '../../components/common/Modal';
 import {
   CreditCard,
   Search,
@@ -13,6 +14,8 @@ import {
   FileSpreadsheet,
   Plus,
   Trash2,
+  Banknote,
+  Receipt,
 } from 'lucide-react';
 
 export const AdminFinance: React.FC = () => {
@@ -21,6 +24,10 @@ export const AdminFinance: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Overdue' | 'Due'>('all');
   const [isCreateBillOpen, setIsCreateBillOpen] = useState(false);
+  const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+  const [selectedBill, setSelectedBill] = useState<MaintenanceBill | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [paymentReference, setPaymentReference] = useState('');
 
   const [selectedFlatId, setSelectedFlatId] = useState('');
   const [billMonth, setBillMonth] = useState(() => {
@@ -112,6 +119,24 @@ export const AdminFinance: React.FC = () => {
 
   const handleSendBulkReminders = () => {
     showToast('Bulk reminders feature coming soon');
+  };
+
+  const handleOpenRecordPayment = (bill: MaintenanceBill) => {
+    setSelectedBill(bill);
+    setPaymentMethod('Cash');
+    setPaymentReference('');
+    setIsRecordPaymentOpen(true);
+  };
+
+  const handleRecordPayment = async () => {
+    if (!selectedBill) return;
+    const methodLabel = paymentReference.trim()
+      ? `${paymentMethod} (${paymentReference.trim()})`
+      : paymentMethod;
+    await markBillPaidManually(selectedBill.id, methodLabel);
+    setIsRecordPaymentOpen(false);
+    setSelectedBill(null);
+    setPaymentReference('');
   };
 
   return (
@@ -386,9 +411,13 @@ export const AdminFinance: React.FC = () => {
               {filteredBills.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center">
-                    <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-slate-700">No bills</p>
-                    <p className="text-xs text-slate-400 mt-1">Create and issue bills to residents from above.</p>
+                    <CreditCard className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-900">No bills yet</h3>
+                    <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                      {searchQuery || statusFilter !== 'all'
+                        ? 'No invoices match your current filters. Try adjusting your search or filter criteria.'
+                        : 'Create and issue maintenance bills to residents using the button above.'}
+                    </p>
                   </td>
                 </tr>
               ) : filteredBills.map((b) => (
@@ -433,7 +462,7 @@ export const AdminFinance: React.FC = () => {
                   <td className="px-5 py-4 text-right">
                     {b.status !== 'Paid' ? (
                       <button
-                        onClick={() => markBillPaidManually(b.id, 'Cheque / Bank Transfer')}
+                        onClick={() => handleOpenRecordPayment(b)}
                         className="text-xs font-bold text-teal-700 hover:text-teal-900 px-3 py-1.5 rounded-lg border border-teal-200 hover:bg-teal-50 transition-colors"
                       >
                         Record Payment
@@ -453,6 +482,92 @@ export const AdminFinance: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Record Payment Modal */}
+      <Modal
+        isOpen={isRecordPaymentOpen}
+        onClose={() => setIsRecordPaymentOpen(false)}
+        title="Record Payment"
+        subtitle={selectedBill ? `Flat ${selectedBill.flat} • ${selectedBill.billingPeriod || `${selectedBill.month} ${selectedBill.year}`}` : ''}
+        maxWidth="sm"
+      >
+        {selectedBill && (
+          <div className="space-y-4">
+            {/* Bill Details */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Resident</span>
+                <span className="font-bold text-slate-900">{selectedBill.residentName}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Bill Number</span>
+                <span className="font-mono font-bold text-slate-900">{selectedBill.billNumber}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Amount Due</span>
+                <span className="font-extrabold text-indigo-700 text-sm">₹{selectedBill.totalAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Due Date</span>
+                <span className="font-semibold text-slate-900">{selectedBill.dueDate}</span>
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Payment Method
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {['Cash', 'Cheque', 'UPI', 'Bank Transfer'].map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    className={`p-3 rounded-xl border text-center font-bold text-xs transition-all ${
+                      paymentMethod === method
+                        ? 'border-indigo-600 bg-indigo-50/60 text-indigo-900 ring-2 ring-indigo-600/20'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {method}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reference Number */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Reference Number (Optional)
+              </label>
+              <input
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder="Cheque number, UTR, transaction ID"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setIsRecordPaymentOpen(false)}
+                className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRecordPayment}
+                className="h-10 px-5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-2"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>Record Payment</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

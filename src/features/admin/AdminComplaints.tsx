@@ -150,9 +150,13 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
               {filteredComplaints.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-12 text-center">
-                    <Wrench className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-slate-700">No complaints</p>
-                    <p className="text-xs text-slate-400 mt-1">No tickets match your current filters.</p>
+                    <Wrench className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-slate-900">No complaints found</h3>
+                    <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+                      {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all'
+                        ? 'No tickets match your current filters. Try adjusting your search or filter criteria.'
+                        : 'No complaints have been reported yet. Issues raised by residents will appear here.'}
+                    </p>
                   </td>
                 </tr>
               ) : filteredComplaints.map((c) => (

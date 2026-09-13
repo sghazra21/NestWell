@@ -373,9 +373,11 @@ export const AdminPeople: React.FC = () => {
                 Pending Membership Requests ({pendingMembers.length})
               </h4>
             </div>
-            {pendingMembers.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs">
-                No pending requests. New join requests from society search appear here.
+              {pendingMembers.length === 0 ? (
+              <div className="p-8 text-center">
+                <Mail className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-700">No pending requests</p>
+                <p className="text-xs text-slate-400 mt-1">New join requests from society search appear here.</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">

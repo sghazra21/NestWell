@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { downloadCSV } from '../../lib/csv';
-import { Users, UserCheck, AlertTriangle, Receipt, CreditCard } from 'lucide-react';
+import { Users, UserCheck, AlertTriangle, Receipt, CreditCard, FileSpreadsheet } from 'lucide-react';
 
 export const AdminReports: React.FC = () => {
   const { residents, visitors, complaints, bills, showToast } = useApp();
@@ -151,6 +151,16 @@ export const AdminReports: React.FC = () => {
           Export live Firestore data to CSV for AGM meetings, tax filings, and committee audits
         </p>
       </div>
+
+      {reports.every((r) => r.count === 0) && (
+        <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+          <FileSpreadsheet className="w-14 h-14 text-slate-200 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-900">No data to export</h3>
+          <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+            Once residents, visitors, complaints, or bills are added to the society, you can export them as CSV reports here.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {reports.map((rep, idx) => (

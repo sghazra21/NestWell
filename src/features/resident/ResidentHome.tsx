@@ -298,7 +298,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
       </section>
 
       {/* 5. Latest Notice */}
-      {latestNotice && (
+      {latestNotice ? (
         <section className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1.5">
@@ -329,7 +329,13 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
             </button>
           </div>
         </section>
-      )}
+      ) : notices.length === 0 ? (
+        <section className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+          <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-slate-700">No notices yet</h3>
+          <p className="text-xs text-slate-400 mt-1">Official circulars from your society will appear here.</p>
+        </section>
+      ) : null}
     </div>
   );
 };
