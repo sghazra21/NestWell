@@ -62,7 +62,7 @@ export const GateApprovalModal: React.FC<GateApprovalModalProps> = ({ isOpen, on
               <Clock className="w-4 h-4 text-slate-400" />
               Arrived At
             </span>
-            <span className="font-medium text-slate-800">10:30 AM (Gate 1)</span>
+            <span className="font-medium text-slate-800">{visitor.entryTime || visitor.expectedTime || 'N/A'} ({visitor.gateNumber || 'Gate 1'})</span>
           </div>
 
           <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">

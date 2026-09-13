@@ -29,7 +29,7 @@ export const InviteVisitorModal: React.FC<InviteVisitorModalProps> = ({ isOpen, 
 
     const pass = inviteVisitor({
       name: name.trim(),
-      phone: phone.trim() || '+91 98000 12345',
+      phone: phone.trim(),
       purpose: purpose.trim(),
       expectedDate,
       expectedTime,

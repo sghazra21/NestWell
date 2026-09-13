@@ -288,6 +288,23 @@ export async function updateSocietyStatus(societyId: string, status: Society['st
   }
 }
 
+export async function updateSocietySettings(
+  societyId: string,
+  settings: Record<string, unknown>
+): Promise<void> {
+  const path = `societies/${societyId}`;
+  try {
+    const clean = sanitizeFirestoreData(settings);
+    await updateDoc(doc(db, 'societies', societyId), {
+      ...clean,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
 // Subcollections wiped on society deletion (elections handled recursively
 // because nominations/votes nest one level deeper).
 const SOCIETY_SUBCOLLECTIONS = [

@@ -75,7 +75,7 @@ export const SecurityApp: React.FC = () => {
 
     inviteVisitor({
       name: walkInName,
-      phone: walkInPhone || '+91 98000 00000',
+      phone: walkInPhone,
       flat: walkInFlat,
       type: walkInType,
       purpose: walkInPurpose,
@@ -101,7 +101,7 @@ export const SecurityApp: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight">Security Gate 1 (Main Gate)</h1>
-              <p className="text-xs text-slate-400">On-Duty Guard: Bahadur Singh • Shift A</p>
+              <p className="text-xs text-slate-400">On-Duty Guard</p>
             </div>
           </div>
 

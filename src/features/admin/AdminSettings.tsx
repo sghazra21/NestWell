@@ -3,13 +3,42 @@ import { useApp } from '../../context/AppContext';
 import { Building, Shield, Landmark, Users, Save, Check } from 'lucide-react';
 
 export const AdminSettings: React.FC = () => {
-  const { currentSociety } = useApp();
+  const { currentSociety, updateSocietySettings, showToast } = useApp();
   const [savedNotice, setSavedNotice] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const [form, setForm] = useState({
+    legalName: currentSociety?.legalName || currentSociety?.name || '',
+    registeredNumber: currentSociety?.registeredNumber || '',
+    address: currentSociety?.address || '',
+    bankName: '',
+    bankAccount: '',
+    bankIfsc: '',
+  });
+
+  const handleChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2000);
+    setIsSaving(true);
+    try {
+      await updateSocietySettings({
+        legalName: form.legalName,
+        registeredNumber: form.registeredNumber,
+        address: form.address,
+        bankName: form.bankName,
+        bankAccount: form.bankAccount,
+        bankIfsc: form.bankIfsc,
+      });
+      setSavedNotice(true);
+      setTimeout(() => setSavedNotice(false), 2000);
+    } catch {
+      showToast('Failed to save settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -38,7 +67,9 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue={currentSociety?.legalName || currentSociety?.name || ''}
+                value={form.legalName}
+                onChange={(e) => handleChange('legalName', e.target.value)}
+                placeholder="Enter society name"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-semibold"
               />
             </div>
@@ -49,7 +80,9 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue="RWA-BLR-2018-842"
+                value={form.registeredNumber}
+                onChange={(e) => handleChange('registeredNumber', e.target.value)}
+                placeholder="e.g. RWA-BLR-2018-842"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-mono"
               />
             </div>
@@ -60,7 +93,9 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue="Plot 14-16, 4th Cross, 7th Main, Koramangala 4th Block, Bengaluru 560034"
+                value={form.address}
+                onChange={(e) => handleChange('address', e.target.value)}
+                placeholder="Enter full society address"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm"
               />
             </div>
@@ -81,7 +116,9 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue="State Bank of India"
+                value={form.bankName}
+                onChange={(e) => handleChange('bankName', e.target.value)}
+                placeholder="e.g. State Bank of India"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-semibold"
               />
             </div>
@@ -92,7 +129,9 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue="40892211440"
+                value={form.bankAccount}
+                onChange={(e) => handleChange('bankAccount', e.target.value)}
+                placeholder="Enter account number"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-mono"
               />
             </div>
@@ -103,7 +142,9 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue="SBIN0004122"
+                value={form.bankIfsc}
+                onChange={(e) => handleChange('bankIfsc', e.target.value)}
+                placeholder="e.g. SBIN0004122"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-mono"
               />
             </div>
@@ -144,10 +185,11 @@ export const AdminSettings: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            className="h-12 px-6 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm flex items-center gap-2 shadow-sm transition-colors"
+            disabled={isSaving}
+            className="h-12 px-6 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            <span>Save Society Settings</span>
+            <span>{isSaving ? 'Saving...' : 'Save Society Settings'}</span>
           </button>
 
           {savedNotice && (

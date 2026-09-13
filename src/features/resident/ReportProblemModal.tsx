@@ -56,7 +56,7 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
       title: title.trim() || `${category} issue in ${resident.flat}`,
       description: description.trim() || 'Urgent repair requested by resident.',
       priority,
-      photoUrl: photoAdded ? 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop&q=80' : undefined,
+      photoUrl: photoAdded ? undefined : undefined,
     });
 
     setSubmittedTicket(ticket);
@@ -211,24 +211,28 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
             </div>
 
             {/* Assigned Staff Notice */}
+            {submittedTicket.assignedTo && (
             <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 text-xs font-bold">
-                  RK
+                  {submittedTicket.assignedTo.name?.charAt(0) || '?'}
                 </div>
                 <div>
                   <span className="text-xs text-slate-500 block">Assigned to:</span>
-                  <span className="text-sm font-bold text-slate-800">Rajesh Kumar (Plumber)</span>
+                  <span className="text-sm font-bold text-slate-800">{submittedTicket.assignedTo.name} ({submittedTicket.assignedTo.role})</span>
                 </div>
               </div>
+              {submittedTicket.assignedTo.phone && (
               <a
-                href="tel:9845122334"
+                href={`tel:${submittedTicket.assignedTo.phone}`}
                 className="h-9 px-3 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 flex items-center gap-1 text-xs font-bold transition-colors"
               >
                 <Phone className="w-3.5 h-3.5" />
                 <span>Call</span>
               </a>
+              )}
             </div>
+            )}
           </div>
 
           {/* Visual Step Timeline */}
@@ -242,29 +246,27 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
                 <span className="absolute -left-[31px] top-0 w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
                   <Check className="w-3.5 h-3.5" />
                 </span>
-                <span className="text-xs text-slate-400 font-mono">10:15 AM</span>
+                <span className="text-xs text-slate-400 font-mono">Just now</span>
                 <h6 className="text-sm font-bold text-slate-900">Reported</h6>
                 <p className="text-xs text-slate-500">Logged via resident mobile app</p>
               </div>
 
               {/* Step 2: Assigned */}
               <div className="relative">
-                <span className="absolute -left-[31px] top-0 w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                  <Check className="w-3.5 h-3.5" />
+                <span className="absolute -left-[31px] top-0 w-6 h-6 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
                 </span>
-                <span className="text-xs text-slate-400 font-mono">10:22 AM</span>
-                <h6 className="text-sm font-bold text-slate-900">Assigned</h6>
-                <p className="text-xs text-slate-500">Allocated to Rajesh Kumar (Plumbing Dept)</p>
+                <h6 className="text-sm font-bold text-slate-700">Assigned</h6>
+                <p className="text-xs text-slate-400">Awaiting assignment</p>
               </div>
 
               {/* Step 3: Work Started */}
               <div className="relative">
-                <span className="absolute -left-[31px] top-0 w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center animate-pulse">
-                  <Clock className="w-3.5 h-3.5" />
+                <span className="absolute -left-[31px] top-0 w-6 h-6 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
                 </span>
-                <span className="text-xs text-indigo-600 font-semibold">Active</span>
-                <h6 className="text-sm font-bold text-indigo-700">Work Started</h6>
-                <p className="text-xs text-slate-500">Technician on site inspecting leakage</p>
+                <h6 className="text-sm font-bold text-slate-700">Work Started</h6>
+                <p className="text-xs text-slate-400">Pending assignment</p>
               </div>
 
               {/* Step 4: Resolved */}

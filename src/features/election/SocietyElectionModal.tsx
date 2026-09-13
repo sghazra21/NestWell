@@ -35,6 +35,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
   const {
     role,
     resident,
+    flats,
     elections,
     nominations,
     votes,
@@ -69,8 +70,8 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
   const [nomForm, setNomForm] = useState({
     position: 'President' as ElectionPosition,
     candidateName: resident.name || '',
-    flat: resident.flat || 'B-402',
-    tower: resident.tower || 'Tower B',
+    flat: resident.flat || '',
+    tower: resident.tower || '',
     profession: '',
     yearsInSociety: 3,
     manifesto: '',
@@ -172,7 +173,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
       votingStart: scheduleForm.votingStart,
       votingEnd: scheduleForm.votingEnd,
       status: 'Nomination Open',
-      eligibleVotersCount: 216,
+      eligibleVotersCount: flats.length || 0,
     });
 
     showToast('New election scheduled successfully!');
@@ -731,7 +732,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                     <input
                       type="number"
                       disabled
-                      value={216}
+                      value={flats.length || 0}
                       className="w-full h-10 px-3 bg-slate-100 rounded-xl border border-slate-200 text-slate-500 font-bold"
                     />
                   </div>

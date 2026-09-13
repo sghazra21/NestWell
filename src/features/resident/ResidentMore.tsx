@@ -208,29 +208,10 @@ export const ResidentMore: React.FC = () => {
           maxWidth="sm"
         >
           <div className="space-y-2.5">
-            {[
-              { name: 'Security Main Gate (Gate 1)', phone: '080-2345-0001', note: 'Intercom 101' },
-              { name: 'Security Service Gate (Gate 2)', phone: '080-2345-0002', note: 'Intercom 102' },
-              { name: 'Society Manager (Col. Nair)', phone: '+91 97456 78901', note: 'Office Tower B' },
-              { name: 'On-Duty Electrician (Ramu)', phone: '+91 98221 44556', note: '24/7 Service' },
-              { name: 'On-Duty Plumber (Rajesh)', phone: '+91 98451 22334', note: '24/7 Service' },
-              { name: 'Local Police Station (Koramangala)', phone: '112 / 080-2294-2200', note: 'Law & Order' },
-              { name: 'Ambulance / Manipal Hospital', phone: '108 / 080-2502-4444', note: 'Emergency Care' },
-            ].map((c, i) => (
-              <div key={i} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <h5 className="text-xs font-bold text-slate-900">{c.name}</h5>
-                  <p className="text-[11px] text-slate-500">{c.note}</p>
-                </div>
-                <a
-                  href={`tel:${c.phone}`}
-                  className="px-3 py-1.5 rounded-lg bg-teal-700 text-white font-bold text-xs flex items-center gap-1 hover:bg-teal-800"
-                >
-                  <PhoneCall className="w-3 h-3" />
-                  <span>Call</span>
-                </a>
-              </div>
-            ))}
+            <div className="p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
+              <p className="text-xs text-slate-500 font-semibold">Emergency contacts not configured</p>
+              <p className="text-[11px] text-slate-400 mt-1">Ask your society admin to add contacts in Settings.</p>
+            </div>
           </div>
         </Modal>
       )}

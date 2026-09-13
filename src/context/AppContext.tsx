@@ -43,6 +43,7 @@ import {
   subscribeSociety,
   createSocietyRecord,
   updateSocietyStatus as updateSocietyStatusInDb,
+  updateSocietySettings as updateSocietySettingsInDb,
   deleteSocietyRecord,
   subscribeTowers,
   createTowerRecord,
@@ -99,6 +100,7 @@ interface AppContextType {
   currentMembership: SocietyMember | null;
   createSociety: (data: Partial<Society> & { name: string; city: string }) => Promise<Society>;
   updateSocietyStatus: (societyId: string, status: Society['status']) => Promise<void>;
+  updateSocietySettings: (settings: Record<string, unknown>) => Promise<void>;
   deleteSociety: (societyId: string) => Promise<number>;
   createTower: (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Tower>;
   createFlat: (data: Omit<Flat, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Flat>;
@@ -637,6 +639,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reason: `Status changed to ${status}`,
     });
     showToast(`Society status updated to ${status}`);
+  };
+
+  const updateSocietySettings = async (settings: Record<string, unknown>) => {
+    if (!currentSocietyId) {
+      showToast('No society selected.');
+      return;
+    }
+    await updateSocietySettingsInDb(currentSocietyId, settings);
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'UPDATE_SOCIETY_SETTINGS',
+      targetType: 'Society',
+      targetId: currentSocietyId,
+      reason: 'Society settings updated',
+    });
+    showToast('Society settings saved to Firestore.');
   };
 
   const deleteSociety = async (socId: string): Promise<number> => {
@@ -1216,6 +1236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentMembership,
         createSociety,
         updateSocietyStatus,
+        updateSocietySettings,
         deleteSociety,
         createTower,
         createFlat,

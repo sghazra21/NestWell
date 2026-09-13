@@ -34,13 +34,9 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
   );
 
   const [resolutionNote, setResolutionNote] = useState('');
-
-  const staffList = [
-    { name: 'Rajesh Kumar', role: 'Plumber', phone: '+91 98451 22334' },
-    { name: 'Ramu Gowda', role: 'Electrician', phone: '+91 98221 44556' },
-    { name: 'Suresh Patil', role: 'Lift Technician (Otis)', phone: '+91 99123 77889' },
-    { name: 'Satish Shinde', role: 'Housekeeping Supervisor', phone: '+91 97890 11223' },
-  ];
+  const [staffName, setStaffName] = useState('');
+  const [staffRole, setStaffRole] = useState('');
+  const [staffPhone, setStaffPhone] = useState('');
 
   const filteredComplaints = complaints.filter((c) => {
     const matchSearch =
@@ -61,12 +57,15 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
     setResolutionNote('');
   };
 
-  const handleAssign = (staff: { name: string; role: string; phone: string }) => {
-    if (!inspectComplaint) return;
-    assignComplaint(inspectComplaint.id, staff.name, staff.role, staff.phone);
+  const handleAssign = (name: string, roleTitle: string, phone: string) => {
+    if (!inspectComplaint || !name.trim()) return;
+    assignComplaint(inspectComplaint.id, name.trim(), roleTitle.trim() || 'Technician', phone.trim());
     setInspectComplaint((prev) =>
-      prev ? { ...prev, assignedTo: staff, status: 'assigned' } : null
+      prev ? { ...prev, assignedTo: { name: name.trim(), role: roleTitle.trim() || 'Technician', phone: phone.trim() }, status: 'assigned' } : null
     );
+    setStaffName('');
+    setStaffRole('');
+    setStaffPhone('');
   };
 
   return (
@@ -267,25 +266,47 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
               <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                 Assign Society Technician
               </h5>
-              <div className="grid grid-cols-2 gap-2">
-                {staffList.map((staff) => {
-                  const isAssigned = inspectComplaint.assignedTo?.name === staff.name;
-                  return (
-                    <button
-                      key={staff.name}
-                      onClick={() => handleAssign(staff)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        isAssigned
-                          ? 'bg-teal-50 border-teal-700 ring-1 ring-teal-700'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="font-bold text-xs text-slate-900">{staff.name}</div>
-                      <div className="text-[11px] text-slate-500">{staff.role}</div>
-                      <div className="text-[10px] font-mono text-slate-400 mt-1">{staff.phone}</div>
-                    </button>
-                  );
-                })}
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Staff name"
+                    value={staffName}
+                    onChange={(e) => setStaffName(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Role (e.g. Plumber)"
+                    value={staffRole}
+                    onChange={(e) => setStaffRole(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Phone"
+                    value={staffPhone}
+                    onChange={(e) => setStaffPhone(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700"
+                  />
+                </div>
+                <button
+                  onClick={() => handleAssign(staffName, staffRole, staffPhone)}
+                  disabled={!staffName.trim()}
+                  className="h-10 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Assign Staff
+                </button>
+                {inspectComplaint.assignedTo && (
+                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-xs text-slate-900">{inspectComplaint.assignedTo.name}</div>
+                      <div className="text-[11px] text-slate-500">{inspectComplaint.assignedTo.role}</div>
+                      <div className="text-[10px] font-mono text-slate-400 mt-1">{inspectComplaint.assignedTo.phone}</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Assigned</span>
+                  </div>
+                )}
               </div>
             </div>
 

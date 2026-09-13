@@ -32,11 +32,13 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
   onOpenNoticeDetails,
   onNavigateToTab,
 }) => {
-  const { resident, gateAlert, complaints, visitors, notices, setIsElectionModalOpen, currentSociety, userProfile } = useApp();
+  const { resident, gateAlert, complaints, visitors, notices, elections, setIsElectionModalOpen, currentSociety, userProfile } = useApp();
 
   const waitingVisitorCount = visitors.filter((v) => v.flat === resident.flat && v.status === 'waiting').length;
   const openComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status !== 'resolved').length;
+  const inProgressComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status === 'started').length;
   const latestNotice = notices[0];
+  const activeElection = elections[0];
 
   return (
     <div className="p-4 space-y-5 max-w-lg mx-auto pb-24">
@@ -80,7 +82,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
                 resident.dues > 0 ? 'text-orange-600' : 'text-emerald-600'
               }`}
             >
-              {resident.dues > 0 ? 'Due 10th Sep • Itemized Breakdown' : 'All Cleared ✓'}
+              {resident.dues > 0 ? 'Due • Itemized Breakdown' : 'All Cleared ✓'}
             </span>
           </div>
           <button
@@ -108,7 +110,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
             {gateAlert.visitor.name} is waiting at the gate.
           </div>
           <p className="text-xs text-orange-800/80 mt-0.5">
-            Arrived 10:30 AM • Delivery / Guest
+            {gateAlert.visitor.entryTime || gateAlert.visitor.expectedTime || 'Recently'} • {gateAlert.visitor.type}
           </p>
           <div className="flex gap-2 mt-3">
             <button
@@ -130,6 +132,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
       )}
 
       {/* 3. Society Elections & Governance Highlight */}
+      {activeElection && (
       <section className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900 to-indigo-800 text-white shadow-md relative overflow-hidden">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -138,7 +141,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
               <span>Society Committee & Elections</span>
             </span>
             <h3 className="text-base font-bold tracking-tight text-white pt-1">
-              RWA Executive Committee 2026–2028
+              {activeElection.title || activeElection.term || 'Society Election'}
             </h3>
             <p className="text-xs text-indigo-200/90 leading-relaxed max-w-xs">
               Digital voting is open. Review verified nominees and cast your confidential secret ballot.
@@ -148,7 +151,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
 
         <div className="mt-3.5 pt-3 border-t border-indigo-700/80 flex items-center justify-between">
           <span className="text-[11px] text-indigo-300 font-medium">
-            142 Votes Cast &bull; 4 Positions
+            {activeElection.totalVotesCast} Votes Cast &bull; {activeElection.positions?.length || 0} Positions
           </span>
           <button
             onClick={() => setIsElectionModalOpen(true)}
@@ -159,6 +162,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
           </button>
         </div>
       </section>
+      )}
 
       {/* 4. Secondary Metric Cards (Visitors & Complaints) */}
       <section className="grid grid-cols-2 gap-3">
@@ -181,7 +185,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
               {waitingVisitorCount > 0 ? `${waitingVisitorCount} waiting` : 'Clear'}
             </div>
             <span className="text-xs font-semibold text-indigo-600 block mt-0.5">
-              Gate 1 Active
+              {waitingVisitorCount > 0 ? 'At Gate' : 'All Clear'}
             </span>
           </div>
           <span className="text-[11px] text-indigo-600 font-bold flex items-center gap-0.5">
@@ -202,7 +206,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
               {openComplaintsCount}
             </div>
             <span className="text-xs font-semibold text-slate-500 block mt-0.5">
-              1 In Progress
+              {inProgressComplaintsCount > 0 ? `${inProgressComplaintsCount} In Progress` : 'None in progress'}
             </span>
           </div>
           <span className="text-[11px] text-indigo-600 font-bold flex items-center gap-0.5">
