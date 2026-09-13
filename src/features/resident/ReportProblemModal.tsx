@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../../components/common/Modal';
 import { ComplaintCategory, ComplaintPriority, Complaint } from '../../types';
+import { uploadComplaintPhoto } from '../../lib/firestoreService';
 import {
   Wrench,
   Zap,
@@ -15,6 +16,8 @@ import {
   Phone,
   Clock,
   Check,
+  Loader2,
+  X,
 } from 'lucide-react';
 
 interface ReportProblemModalProps {
@@ -28,14 +31,17 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
   onClose,
   initialCategory = 'Plumbing',
 }) => {
-  const { submitComplaint, resident } = useApp();
+  const { submitComplaint, resident, currentSocietyId } = useApp();
 
   const [category, setCategory] = useState<ComplaintCategory>(initialCategory);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<ComplaintPriority>('Normal');
-  const [photoAdded, setPhotoAdded] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState<Complaint | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories: { id: ComplaintCategory; label: string; icon: React.ReactNode }[] = [
     { id: 'Plumbing', label: 'Plumbing', icon: <Droplets className="w-5 h-5 text-indigo-600" /> },
@@ -47,19 +53,56 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
     { id: 'Other', label: 'Other', icon: <HelpCircle className="w-5 h-5 text-slate-500" /> },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() && !description.trim()) return;
+
+    let photoUrl: string | undefined;
+    if (photoFile && currentSocietyId) {
+      setUploading(true);
+      try {
+        const tempId = `comp-${Date.now()}`;
+        photoUrl = await uploadComplaintPhoto(currentSocietyId, tempId, photoFile);
+      } catch (err) {
+        console.warn('Photo upload failed:', err);
+      } finally {
+        setUploading(false);
+      }
+    }
 
     const ticket = submitComplaint({
       category,
       title: title.trim() || `${category} issue in ${resident.flat}`,
       description: description.trim() || 'Urgent repair requested by resident.',
       priority,
-      photoUrl: photoAdded ? undefined : undefined,
+      photoUrl,
     });
 
     setSubmittedTicket(ticket);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Only image files are allowed');
+        return;
+      }
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleReset = () => {
@@ -67,7 +110,8 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
     setDescription('');
     setCategory('Plumbing');
     setPriority('Normal');
-    setPhotoAdded(false);
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setSubmittedTicket(null);
     onClose();
   };
@@ -137,23 +181,45 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
             />
           </div>
 
-          {/* Photo Upload Simulation */}
+          {/* Photo Upload */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
               Attach Photo (Optional)
             </label>
-            <button
-              type="button"
-              onClick={() => setPhotoAdded(!photoAdded)}
-              className={`w-full h-12 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 text-xs font-semibold transition-colors ${
-                photoAdded
-                  ? 'border-indigo-600 bg-indigo-50/60 text-indigo-700'
-                  : 'border-slate-300 hover:border-slate-400 text-slate-600 bg-slate-50'
-              }`}
-            >
-              <Camera className="w-4 h-4 text-indigo-600" />
-              <span>{photoAdded ? '1 Photo attached (water_leak.jpg)' : 'Tap to take or upload photo'}</span>
-            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="complaint-photo-input"
+            />
+            {photoPreview ? (
+              <div className="relative">
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  className="w-full h-32 object-cover rounded-xl border border-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <p className="text-xs text-slate-500 mt-1">{photoFile?.name}</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-12 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 text-xs font-semibold transition-colors border-slate-300 hover:border-slate-400 text-slate-600 bg-slate-50"
+              >
+                <Camera className="w-4 h-4 text-indigo-600" />
+                <span>Tap to take or upload photo</span>
+              </button>
+            )}
           </div>
 
           {/* Priority */}
@@ -186,10 +252,20 @@ export const ReportProblemModal: React.FC<ReportProblemModalProps> = ({
             <button
               id="submit-complaint-btn"
               type="submit"
-              className="w-full h-13 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              disabled={uploading}
+              className="w-full h-13 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Wrench className="w-4 h-4" />
-              <span>Submit Problem Report</span>
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Uploading Photo...</span>
+                </>
+              ) : (
+                <>
+                  <Wrench className="w-4 h-4" />
+                  <span>Submit Problem Report</span>
+                </>
+              )}
             </button>
           </div>
         </form>

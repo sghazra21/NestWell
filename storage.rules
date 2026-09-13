@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Society-scoped uploads
+    match /societies/{societyId}/{allPaths=**} {
+      // Any authenticated society member can read
+      allow read: if request.auth != null;
+      // Society members can write to their society folder
+      allow write: if request.auth != null 
+        && request.resource.size < 5 * 1024 * 1024  // 5MB limit
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -14,6 +14,7 @@ import {
   writeBatch,
   increment,
 } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, FirebaseUser } from './firebase';
 import {
   Society,
@@ -1347,4 +1348,32 @@ export async function createSupportSessionRecord(
     handleFirestoreError(error, OperationType.CREATE, path);
     throw error;
   }
+}
+
+// -------------------------------------------------------------
+// 13. FIREBASE STORAGE (File Uploads)
+// -------------------------------------------------------------
+
+const storage = getStorage();
+
+export async function uploadComplaintPhoto(
+  societyId: string,
+  complaintId: string,
+  file: File
+): Promise<string> {
+  const path = `societies/${societyId}/complaints/${complaintId}/${file.name}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
+}
+
+export async function uploadNoticeAttachment(
+  societyId: string,
+  noticeId: string,
+  file: File
+): Promise<string> {
+  const path = `societies/${societyId}/notices/${noticeId}/${file.name}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
 }

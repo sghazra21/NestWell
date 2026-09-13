@@ -3,6 +3,9 @@
     "database": "ai-studio-nestwellsocietya-3362f689-fc24-4131-9685-c6aa5e473e20",
     "rules": "firestore.rules"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": "dist",
     "ignore": [

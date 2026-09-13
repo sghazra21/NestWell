@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { NoticePriority, Notice } from '../../types';
+import { uploadNoticeAttachment } from '../../lib/firestoreService';
 import { Modal } from '../../components/common/Modal';
-import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles } from 'lucide-react';
+import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles, Loader2, X, Upload } from 'lucide-react';
 
 export const AdminNotices: React.FC = () => {
-  const { notices, createNotice, userProfile, currentSociety, towers } = useApp();
+  const { notices, createNotice, userProfile, currentSociety, towers, currentSocietyId } = useApp();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -14,10 +15,27 @@ export const AdminNotices: React.FC = () => {
   const [priority, setPriority] = useState<NoticePriority>('normal');
   const [audience, setAudience] = useState<string>('All Residents');
   const [time, setTime] = useState('10:00 AM – 02:00 PM');
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePublish = (e: React.FormEvent) => {
+  const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !message) return;
+
+    let attachmentName: string | undefined;
+    if (attachmentFile && currentSocietyId) {
+      setUploading(true);
+      try {
+        const tempId = `notice-${Date.now()}`;
+        await uploadNoticeAttachment(currentSocietyId, tempId, attachmentFile);
+        attachmentName = attachmentFile.name;
+      } catch (err) {
+        console.warn('Attachment upload failed:', err);
+      } finally {
+        setUploading(false);
+      }
+    }
 
     createNotice({
       title,
@@ -25,12 +43,35 @@ export const AdminNotices: React.FC = () => {
       priority,
       audience: audience as Notice['audience'],
       targetBlock: audience.endsWith(' Only') ? audience.replace(/ Only$/, '') : undefined,
-      attachmentName: 'Official_Notice.pdf',
+      attachmentName,
     });
 
     setIsCreateModalOpen(false);
     setTitle('');
     setMessage('');
+    setAttachmentFile(null);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Only image files are allowed');
+        return;
+      }
+      setAttachmentFile(file);
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    setAttachmentFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -183,12 +224,58 @@ export const AdminNotices: React.FC = () => {
             />
           </div>
 
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Attachment (Optional)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="notice-attachment-input"
+            />
+            {attachmentFile ? (
+              <div className="flex items-center gap-2 p-3 bg-teal-50 rounded-xl border border-teal-200">
+                <FileText className="w-5 h-5 text-teal-600" />
+                <span className="text-sm text-teal-700 flex-1 truncate">{attachmentFile.name}</span>
+                <button
+                  type="button"
+                  onClick={handleRemoveAttachment}
+                  className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-11 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 text-xs font-semibold transition-colors border-slate-300 hover:border-slate-400 text-slate-600 bg-slate-50"
+              >
+                <Upload className="w-4 h-4 text-teal-600" />
+                <span>Tap to upload attachment</span>
+              </button>
+            )}
+          </div>
+
           <button
             type="submit"
-            className="w-full h-13 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm rounded-xl mt-2 flex items-center justify-center gap-2"
+            disabled={uploading}
+            className="w-full h-13 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm rounded-xl mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Send className="w-4 h-4" />
-            <span>Publish Notice to All Residents</span>
+            {uploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Uploading Attachment...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>Publish Notice to All Residents</span>
+              </>
+            )}
           </button>
         </form>
       </Modal>
