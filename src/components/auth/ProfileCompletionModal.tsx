@@ -97,7 +97,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
             Complete Your Society Profile
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            Greenwood Heights bylaws require all residents to link their verified apartment unit and mobile contact for gate approvals and society billing.
+            Society bylaws require all residents to link their verified apartment unit and mobile contact for gate approvals and society billing.
           </p>
         </div>
 

@@ -21,13 +21,14 @@ interface PayMaintenanceModalProps {
 }
 
 export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen, onClose }) => {
-  const { resident, bills, payMaintenanceBill, showToast } = useApp();
+  const { resident, bills, payMaintenanceBill, showToast, currentSociety } = useApp();
 
-  const activeBill = bills.find((b) => b.flat === resident.flat && b.status !== 'Paid') || bills[0];
+  // Real bill for the resident's flat only. Undefined = no dues: render empty state.
+  const activeBill = bills.find((b) => b.flat === resident.flat && b.status !== 'Paid');
 
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
   const [upiOption, setUpiOption] = useState<'qr' | 'intent' | 'vpa'>('qr');
-  const [upiId, setUpiId] = useState('sayan@oksbi');
+  const [upiId, setUpiId] = useState('');
   const [utrNumber, setUtrNumber] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isResearchModalOpen, setIsResearchModalOpen] = useState(false);
@@ -39,19 +40,27 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
 
   const [showReceiptView, setShowReceiptView] = useState(false);
 
-  const billAmount = activeBill ? activeBill.totalAmount : 4600;
-  const upiVpa = 'greenwoodrwa@sbi';
-  const payeeName = 'Greenwood Heights RWA';
-  const upiIntentUri = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(
-    payeeName
-  )}&am=${billAmount}&cu=INR&tn=${encodeURIComponent(`Maint_${resident.flat}_Sep2026`)}`;
+  const billAmount = activeBill ? activeBill.totalAmount : 0;
+  // Payee details come from the society's billing configuration.
+  // Until billing is configured, payments are unavailable (no hardcoded VPA).
+  const upiVpa = '';
+  const payeeName = currentSociety?.name || 'Society';
+  const upiIntentUri = upiVpa
+    ? `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(
+      payeeName
+    )}&am=${billAmount}&cu=INR&tn=${encodeURIComponent(`Maint_${resident.flat}`)}`
+    : '';
 
   const handlePayNow = () => {
+    if (!activeBill) {
+      showToast('No outstanding bill to pay.');
+      return;
+    }
     setIsProcessing(true);
     setTimeout(() => {
       const txId = utrNumber.trim() ? `UTR-${utrNumber.trim()}` : `UPI-${Math.floor(100000000000 + Math.random() * 900000000000)}`;
       const result = payMaintenanceBill(
-        activeBill?.id || 'bill-1',
+        activeBill.id,
         paymentMethod === 'upi'
           ? `UPI (${upiOption.toUpperCase()} • ${txId})`
           : paymentMethod === 'card'
@@ -338,7 +347,7 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
 
             <div className="flex items-center gap-2 text-xs text-slate-500 justify-center">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Direct settlement into Greenwood Heights RWA State Bank Current A/c</span>
+              <span>Direct settlement into {payeeName} society account</span>
             </div>
 
             {/* Pay Button */}
@@ -414,9 +423,9 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
           <div className="space-y-4">
             <div className="p-5 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 space-y-3 font-sans shadow-sm">
               <div className="border-b pb-3 text-center">
-                <h5 className="font-bold text-sm text-slate-900">GREENWOOD HEIGHTS APARTMENT OWNERS RWA</h5>
+                <h5 className="font-bold text-sm text-slate-900">{(currentSociety?.legalName || currentSociety?.name || 'Society').toUpperCase()}</h5>
                 <p className="text-[11px] text-slate-500">
-                  Reg. No. RWA-BLR-2018-842 &bull; GSTIN: 29AAAAA0000A1Z5 &bull; Bengaluru, KA
+                  {currentSociety?.registeredNumber ? `Reg. No. ${currentSociety.registeredNumber} • ` : ''}{currentSociety?.city || ''}
                 </p>
                 <div className="mt-2 inline-block px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider text-[10px]">
                   Official Maintenance Tax Invoice & Receipt

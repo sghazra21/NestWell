@@ -38,6 +38,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
     nominations,
     votes,
     committeeMembers,
+    currentSociety,
     castVote,
     submitNomination,
     updateNominationStatus,
@@ -76,13 +77,13 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
 
   // Admin Schedule Election state
   const [scheduleForm, setScheduleForm] = useState({
-    title: 'Greenwood Heights RWA Executive Council (2026-2028)',
-    term: '2026-2028',
-    description: 'Biennial elections to elect society leadership.',
-    nominationStart: '2026-10-01',
-    nominationEnd: '2026-10-15',
-    votingStart: '2026-10-20',
-    votingEnd: '2026-10-25',
+    title: '',
+    term: '',
+    description: '',
+    nominationStart: '',
+    nominationEnd: '',
+    votingStart: '',
+    votingEnd: '',
   });
 
   if (!isOpen || !currentElection) return null;
@@ -466,7 +467,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
               <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-indigo-900">
                 <h4 className="font-bold text-sm mb-1">File Candidacy for RWA Committee</h4>
                 <p>
-                  Any flat owner residing in Greenwood Heights for at least 1 year with zero outstanding maintenance arrears is eligible to nominate for executive posts.
+                  Any flat owner residing in {currentSociety?.name || 'the society'} for at least 1 year with zero outstanding maintenance arrears is eligible to nominate for executive posts.
                 </p>
               </div>
 

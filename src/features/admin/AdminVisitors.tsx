@@ -9,12 +9,11 @@ import {
   ArrowUpRight,
   Filter,
   CheckCircle2,
-  BellRing,
   Download,
 } from 'lucide-react';
 
 export const AdminVisitors: React.FC = () => {
-  const { visitors, securityCheckIn, securityCheckOut, triggerGateSimulation } = useApp();
+  const { visitors, updateVisitorStatus } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'inside' | 'expected' | 'exited'>('all');
@@ -47,14 +46,6 @@ export const AdminVisitors: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={triggerGateSimulation}
-            className="h-10 px-4 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-2"
-          >
-            <BellRing className="w-4 h-4 text-amber-600 animate-bounce" />
-            <span>Simulate Gate Entry</span>
-          </button>
-
           <button
             onClick={() => alert('Exporting visitor entry logs (CSV format)...')}
             className="h-10 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5"
@@ -184,7 +175,7 @@ export const AdminVisitors: React.FC = () => {
                   <td className="px-5 py-4 text-right">
                     {v.status === 'expected' || v.status === 'waiting' ? (
                       <button
-                        onClick={() => securityCheckIn(v.id)}
+                        onClick={() => updateVisitorStatus(v.id, 'inside')}
                         className="h-8 px-3 rounded-lg bg-teal-700 text-white hover:bg-teal-800 text-xs font-bold transition-colors inline-flex items-center gap-1"
                       >
                         <ArrowDownLeft className="w-3.5 h-3.5" />
@@ -192,7 +183,7 @@ export const AdminVisitors: React.FC = () => {
                       </button>
                     ) : v.status === 'inside' ? (
                       <button
-                        onClick={() => securityCheckOut(v.id)}
+                        onClick={() => updateVisitorStatus(v.id, 'exited')}
                         className="h-8 px-3 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-xs font-bold transition-colors inline-flex items-center gap-1"
                       >
                         <ArrowUpRight className="w-3.5 h-3.5" />

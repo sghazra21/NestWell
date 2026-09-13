@@ -30,10 +30,14 @@ export const AdminPeople: React.FC = () => {
     promoteToSocietyAdmin,
     registeredUsers,
     userProfile,
+    currentSociety,
+    members,
+    setMemberStatus,
+    inviteMember,
     showToast,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'residents' | 'app_accounts'>('residents');
+  const [activeTab, setActiveTab] = useState<'residents' | 'app_accounts' | 'invites'>('residents');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'All' | 'Owner' | 'Tenant'>('All');
   const [towerFilter, setTowerFilter] = useState<'All' | 'Tower A' | 'Tower B'>('All');
@@ -48,6 +52,14 @@ export const AdminPeople: React.FC = () => {
   const [newEmail, setNewEmail] = useState('');
   const [newType, setNewType] = useState<'Owner' | 'Tenant'>('Owner');
   const [newTower, setNewTower] = useState<'Tower A' | 'Tower B'>('Tower B');
+
+  // Invite form state
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'resident' | 'security' | 'committee' | 'society_admin'>('resident');
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
+
+  const pendingMembers = members.filter((m) => m.status === 'pending');
 
   const filteredResidents = residents.filter((r) => {
     const matchSearch =
@@ -73,10 +85,9 @@ export const AdminPeople: React.FC = () => {
       phone: newPhone,
       email: newEmail || `${newName.toLowerCase().replace(/\s+/g, '.')}@example.com`,
       type: newType,
-      dues: 4600,
+      dues: 0,
       familyMembers: [],
       vehicles: [],
-      occupancyDate: 'Sep 2024',
     });
 
     setIsAddModalOpen(false);
@@ -84,6 +95,29 @@ export const AdminPeople: React.FC = () => {
     setNewName('');
     setNewPhone('');
     setNewEmail('');
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    setIsInviting(true);
+    try {
+      const code = await inviteMember(inviteEmail.trim(), inviteRole);
+      setInviteCode(code);
+      showToast(`Invitation created for ${inviteEmail.trim()}. Share the code.`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to create invitation.');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleApprove = async (uid: string) => {
+    await setMemberStatus(uid, 'active');
+  };
+
+  const handleReject = async (uid: string) => {
+    await setMemberStatus(uid, 'removed');
   };
 
   const handlePromote = async (
@@ -136,6 +170,22 @@ export const AdminPeople: React.FC = () => {
               {registeredUsers.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-700 text-[10px]">
                   {registeredUsers.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('invites')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'invites'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Invites & Requests</span>
+              {pendingMembers.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-700 text-[10px]">
+                  {pendingMembers.length}
                 </span>
               )}
             </button>
@@ -240,7 +290,7 @@ export const AdminPeople: React.FC = () => {
                         </span>
                       )}
 
-                      {usr.role === 'admin' && usr.email !== 'admin@greenwood.in' && (
+                      {usr.role === 'admin' && (
                         <button
                           onClick={() => handlePromote(usr.id, 'resident', 'Resident')}
                           className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold text-xs"
@@ -253,6 +303,104 @@ export const AdminPeople: React.FC = () => {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      ) : activeTab === 'invites' ? (
+        /* Invites & Membership Requests Tab */
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+            <h4 className="text-sm font-bold text-slate-900">Invite Member by Email</h4>
+            <p className="text-xs text-slate-500">
+              The invited person signs in with this email, enters the code, and joins as the selected role.
+            </p>
+            {!inviteCode ? (
+              <form
+                onSubmit={handleInvite}
+                className="grid grid-cols-1 sm:grid-cols-4 gap-2"
+              >
+                <input
+                  type="email"
+                  required
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="member@example.com"
+                  className="h-10 px-3 rounded-xl border border-slate-200 text-sm sm:col-span-2"
+                />
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as any)}
+                  className="h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white"
+                >
+                  <option value="resident">Resident</option>
+                  <option value="security">Security</option>
+                  <option value="committee">Committee</option>
+                  <option value="society_admin">Society Admin</option>
+                </select>
+                <button
+                  type="submit"
+                  disabled={isInviting}
+                  className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold disabled:opacity-50"
+                >
+                  {isInviting ? 'Creating…' : 'Create Invite'}
+                </button>
+              </form>
+            ) : (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center space-y-2">
+                <p className="text-[11px] uppercase tracking-wider text-emerald-700 font-bold">
+                  Share this code with {inviteEmail}
+                </p>
+                <p className="text-2xl font-mono font-black text-slate-900 tracking-wider">
+                  {inviteCode}
+                </p>
+                <button
+                  onClick={() => {
+                    setInviteCode(null);
+                    setInviteEmail('');
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+                >
+                  Invite another member
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-100">
+              <h4 className="text-sm font-bold text-slate-900">
+                Pending Membership Requests ({pendingMembers.length})
+              </h4>
+            </div>
+            {pendingMembers.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs">
+                No pending requests. New join requests from society search appear here.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {pendingMembers.map((m) => (
+                  <div key={m.id} className="p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="font-bold text-slate-900">{m.name}</div>
+                      <div className="text-xs text-slate-500">{m.email}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleApprove(m.uid)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(m.uid)}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold text-xs"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -575,7 +723,7 @@ export const AdminPeople: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         title="Add New Society Resident"
-        subtitle="Register flat owner or tenant to Greenwood Heights RWA"
+        subtitle={`Register flat owner or tenant to ${currentSociety?.name || 'society'}`}
         maxWidth="md"
       >
         <form onSubmit={handleCreateResident} className="space-y-4">

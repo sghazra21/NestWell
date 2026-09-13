@@ -39,6 +39,7 @@ export const AdminLayout: React.FC = () => {
     elections,
     nominations,
     committeeMembers,
+    currentSociety,
     setIsElectionModalOpen,
     setIsPaymentsResearchOpen,
   } = useApp();
@@ -85,7 +86,7 @@ export const AdminLayout: React.FC = () => {
             <div className="w-4 h-4 border-2 border-white rounded-xs" />
           </div>
           <span className="font-bold text-lg tracking-tight">
-            Greenwood Heights <span className="text-indigo-600">Admin</span>
+            {currentSociety?.name || 'Society'} <span className="text-indigo-600">Admin</span>
           </span>
         </div>
 
@@ -256,7 +257,7 @@ export const AdminLayout: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">Current RWA Managing Committee</h3>
-                      <p className="text-xs text-slate-500">Elected office-bearers currently presiding over Greenwood Heights</p>
+                      <p className="text-xs text-slate-500">Elected office-bearers currently presiding over the society</p>
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
                       Term: 2024–2026

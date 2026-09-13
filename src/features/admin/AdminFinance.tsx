@@ -51,7 +51,7 @@ export const AdminFinance: React.FC = () => {
             Society Maintenance & Accounts
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            September 2024 Billing Cycle • Greenwood Heights RWA State Bank A/c
+            Maintenance billing overview for the current cycle.
           </p>
         </div>
 
@@ -193,7 +193,7 @@ export const AdminFinance: React.FC = () => {
                   </td>
 
                   <td className="px-5 py-4 text-xs text-slate-500">
-                    {b.paidVia || (
+                    {b.paymentMethod || (
                       <span className="text-slate-400 italic">Unpaid</span>
                     )}
                   </td>
@@ -208,7 +208,7 @@ export const AdminFinance: React.FC = () => {
                       </button>
                     ) : (
                       <button
-                        onClick={() => alert(`Receipt #${b.receiptNumber || 'REC-8801'} generated.`)}
+                        onClick={() => alert(`Receipt for bill ${b.billNumber}${b.transactionId ? ` • ${b.transactionId}` : ''}.`)}
                         className="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
                       >
                         Receipt

@@ -32,7 +32,7 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
   onOpenNoticeDetails,
   onNavigateToTab,
 }) => {
-  const { resident, gateAlert, complaints, visitors, notices, setIsElectionModalOpen } = useApp();
+  const { resident, gateAlert, complaints, visitors, notices, setIsElectionModalOpen, currentSociety, userProfile } = useApp();
 
   const waitingVisitorCount = visitors.filter((v) => v.flat === resident.flat && v.status === 'waiting').length;
   const openComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status !== 'resolved').length;
@@ -45,8 +45,8 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
         <div className="flex justify-between items-start mb-4">
           <div>
             <div className="text-xs text-indigo-200 font-medium">Good evening,</div>
-            <div className="text-2xl font-bold tracking-tight">Sayan 👋</div>
-            <div className="text-xs text-indigo-200/90 mt-0.5">Greenwood Heights RWA</div>
+            <div className="text-2xl font-bold tracking-tight">{resident.name.split(' ')[0] || userProfile?.name?.split(' ')[0] || 'Resident'} 👋</div>
+            <div className="text-xs text-indigo-200/90 mt-0.5">{currentSociety?.name || ''}</div>
           </div>
           <div className="flex items-center gap-2">
             <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-xs">
@@ -272,22 +272,24 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
             </div>
           </button>
 
-          {/* Book Facility */}
-          <button
-            id="quick-action-book-btn"
-            onClick={onOpenBookFacility}
-            className="p-4 rounded-2xl bg-white border border-slate-100 hover:border-indigo-600 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div className="mt-3">
-              <div className="text-sm font-bold text-slate-800 group-hover:text-purple-600">
-                Book Facility
+          {/* Book Facility (only when the society enables facility booking) */}
+          {currentSociety?.features?.facilityBooking !== false && (
+            <button
+              id="quick-action-book-btn"
+              onClick={onOpenBookFacility}
+              className="p-4 rounded-2xl bg-white border border-slate-100 hover:border-indigo-600 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between group active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <Building2 className="w-5 h-5" />
               </div>
-              <div className="text-[11px] text-slate-400">Clubhouse, gym, court</div>
-            </div>
-          </button>
+              <div className="mt-3">
+                <div className="text-sm font-bold text-slate-800 group-hover:text-purple-600">
+                  Book Facility
+                </div>
+                <div className="text-[11px] text-slate-400">Clubhouse, gym, court</div>
+              </div>
+            </button>
+          )}
         </div>
       </section>
 

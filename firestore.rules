@@ -2,7 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global helper functions
+    // ---------- Helpers ----------
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -11,106 +12,140 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Check if user has global platform admin privileges
+    function callerEmail() {
+      return isSignedIn() ? request.auth.token.email.lower() : '';
+    }
+
+    // Platform admin is resolved ONLY from the platformUsers document.
+    // No email allowlists. No client-settable flags.
     function isPlatformAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'sghazra21@gmail.com' ||
-        (exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.platformRole == 'platform_admin')
-      );
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.platformRole == 'platform_admin';
     }
 
-    // Check if user is an active member of the specified society
+    function societyDoc(societyId) {
+      return get(/databases/$(database)/documents/societies/$(societyId));
+    }
+
+    function societyIsUsable(societyId) {
+      return societyDoc(societyId).data.status != 'suspended'
+        && societyDoc(societyId).data.status != 'archived';
+    }
+
+    function memberDoc(societyId) {
+      return get(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid));
+    }
+
+    // Active membership record (society itself may be suspended —
+    // used for reading society status so the UI can show "suspended").
+    function hasActiveMembership(societyId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid))
+        && memberDoc(societyId).data.status == 'active';
+    }
+
+    // Active membership in a usable society (operational access).
     function isSocietyMember(societyId) {
-      return isSignedIn() && (
-        isPlatformAdmin() ||
-        (exists(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)).data.status == 'active')
-      );
+      return hasActiveMembership(societyId) && societyIsUsable(societyId);
     }
 
-    // Get society member role
-    function getSocietyRole(societyId) {
-      return get(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)).data.role;
+    function societyRole(societyId) {
+      return memberDoc(societyId).data.role;
     }
 
-    // Check if user is Society Admin in this tenant
     function isSocietyAdmin(societyId) {
-      return isPlatformAdmin() || (
-        isSocietyMember(societyId) && (
-          getSocietyRole(societyId) == 'society_admin' ||
-          getSocietyRole(societyId) == 'admin'
-        )
-      );
+      return isSocietyMember(societyId)
+        && (societyRole(societyId) == 'society_admin' || societyRole(societyId) == 'admin');
     }
 
-    // Check if user is Security personnel in this tenant
     function isSecurityGuard(societyId) {
-      return isSocietyAdmin(societyId) || (
-        isSocietyMember(societyId) && getSocietyRole(societyId) == 'security'
-      );
+      return isSocietyAdmin(societyId)
+        || (isSocietyMember(societyId) && societyRole(societyId) == 'security');
     }
 
-    // Global Platform Users Index
+    // ---------- Platform Users (global identity index) ----------
+    // Owner may update ONLY safe profile fields. platformRole and
+    // societyIds are never client-writable (bootstrap / invite flows only).
     match /platformUsers/{userId} {
-      allow read: if isSignedIn();
-      allow create, update: if isOwner(userId) || isPlatformAdmin();
+      allow get: if isOwner(userId) || isPlatformAdmin();
+      allow list: if isPlatformAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.platformRole == null
+        && (!('societyIds' in request.resource.data) || request.resource.data.societyIds.size() == 0);
+      allow update: if (isOwner(userId)
+        && request.resource.data.platformRole == resource.data.platformRole
+        && request.resource.data.societyIds == resource.data.societyIds)
+        || isPlatformAdmin();
       allow delete: if isPlatformAdmin();
     }
 
-    // Society Invites
-    match /societyInvites/{inviteId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+    // ---------- Society Invites (code is the document ID) ----------
+    match /societyInvites/{code} {
+      // Single-invite lookup for acceptance; codes are high-entropy secrets.
+      allow get: if isSignedIn();
+      allow list: if isPlatformAdmin();
+      // Platform admins and society admins of the target society mint invites.
+      allow create: if isPlatformAdmin()
+        || (isSignedIn() && isSocietyAdmin(request.resource.data.societyId));
+      // Accept: only the invited email holder, only pending->accepted.
+      // Revoke/expire: platform admin.
+      allow update: if isPlatformAdmin()
+        || (isSignedIn()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted'
+          && resource.data.email == callerEmail()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy', 'acceptedAt']));
       allow delete: if isPlatformAdmin();
     }
 
-    // Platform Analytics (Derived rollups)
-    match /platformAnalytics/{societyId} {
-      allow read: if isSignedIn();
-      allow write: if isPlatformAdmin() || isSignedIn();
-    }
-
-    // Support Sessions
-    match /supportSessions/{sessionId} {
-      allow read, write: if isPlatformAdmin();
-    }
-
-    // Societies (Tenant Root)
+    // ---------- Societies ----------
     match /societies/{societyId} {
-      allow read: if isSignedIn();
-      allow create: if isPlatformAdmin() || isSignedIn();
-      allow update, delete: if isPlatformAdmin() || isSocietyAdmin(societyId);
+      // Members can always read their society doc (needed to display
+      // "suspended" state). Public directory for join-by-search.
+      allow get: if isPlatformAdmin()
+        || hasActiveMembership(societyId)
+        || (isSignedIn() && resource.data.status in ['active', 'onboarding']);
+      allow list: if isPlatformAdmin()
+        || (isSignedIn() && resource.data.status in ['active', 'onboarding']);
+      allow create: if isPlatformAdmin();
+      allow update: if isPlatformAdmin() || isSocietyAdmin(societyId);
+      allow delete: if isPlatformAdmin();
 
-      // Towers subcollection
       match /towers/{towerId} {
         allow read: if isSocietyMember(societyId);
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Flats subcollection (First-class units)
       match /flats/{flatId} {
         allow read: if isSocietyMember(societyId);
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Members subcollection (Authoritative society role)
       match /members/{memberId} {
         allow read: if isSocietyMember(societyId);
-        allow create: if isSignedIn();
-        allow update: if isSocietyAdmin(societyId) || isOwner(memberId);
+        // Self join-request (pending only). Invite acceptance creates the
+        // active record client-side as an INTERIM step (see Phase 12:
+        // migrate to a Cloud Function for server-validated acceptance).
+        allow create: if isOwner(memberId)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.status in ['pending', 'active']
+          && request.resource.data.role in ['resident', 'security', 'committee', 'society_admin'];
+        // Self safe-field edits, or full management by society admin.
+        allow update: if isSocietyAdmin(societyId)
+          || (isOwner(memberId)
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.status == resource.data.status);
         allow delete: if isSocietyAdmin(societyId);
       }
 
-      // Visitors & Gate Security
       match /visitors/{visitorId} {
         allow read: if isSocietyMember(societyId);
         allow create: if isSocietyMember(societyId);
-        allow update: if isSocietyMember(societyId) || isSecurityGuard(societyId) || isSocietyAdmin(societyId);
+        allow update: if isSocietyMember(societyId) || isSecurityGuard(societyId);
         allow delete: if isSocietyAdmin(societyId);
       }
 
-      // Complaints & Maintenance Tickets
       match /complaints/{complaintId} {
         allow read: if isSocietyMember(societyId);
         allow create: if isSocietyMember(societyId);
@@ -118,65 +153,87 @@ service cloud.firestore {
         allow delete: if isSocietyAdmin(societyId);
       }
 
-      // Billing & Dues
       match /bills/{billId} {
         allow read: if isSocietyMember(societyId);
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Server-confirmed Payments
+      // Payments are server-confirmed (Phase 12). Client may initiate
+      // a pending attempt; confirmation is backend-only.
       match /payments/{paymentId} {
         allow read: if isSocietyMember(societyId);
-        allow create, update: if isSocietyMember(societyId);
-        allow delete: if isSocietyAdmin(societyId);
+        allow create: if isSocietyMember(societyId)
+          && request.resource.data.status == 'pending';
+        allow update, delete: if false;
       }
 
-      // Facilities & Amenities
       match /facilities/{facilityId} {
         allow read: if isSocietyMember(societyId);
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Facility Bookings
       match /facilityBookings/{bookingId} {
         allow read: if isSocietyMember(societyId);
         allow create, update: if isSocietyMember(societyId);
         allow delete: if isSocietyAdmin(societyId);
       }
 
-      // Notices & Circulars
       match /notices/{noticeId} {
         allow read: if isSocietyMember(societyId);
         allow write: if isSocietyAdmin(societyId);
       }
 
-      // Elections & Ballots
       match /elections/{electionId} {
         allow read: if isSocietyMember(societyId);
-        allow write: if isSocietyAdmin(societyId);
+        allow create, delete: if isSocietyAdmin(societyId);
+        // INTERIM: members may bump the vote counter when casting a vote
+        // (Phase 12 migrates voting to a transactional Cloud Function with
+        // server-side duplicate prevention).
+        allow update: if isSocietyAdmin(societyId)
+          || (isSocietyMember(societyId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalVotesCast', 'updatedAt']));
 
         match /nominations/{nominationId} {
           allow read: if isSocietyMember(societyId);
           allow create: if isSocietyMember(societyId);
-          allow update, delete: if isSocietyAdmin(societyId) || isOwner(request.resource.data.candidateId);
+          allow update: if isSocietyAdmin(societyId)
+            || (isSocietyMember(societyId)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voteCount', 'updatedAt']));
+          allow delete: if isSocietyAdmin(societyId);
         }
 
         match /votes/{voteId} {
           allow read: if isSocietyMember(societyId);
+          // One vote per voter enforced by doc ID = voter+position (Phase 12).
           allow create: if isSocietyMember(societyId);
-          allow update: if isSocietyAdmin(societyId);
+          allow update, delete: if false;
         }
       }
 
-      // Immutable Audit Logs
       match /auditLogs/{logId} {
         allow read: if isSocietyAdmin(societyId);
         allow create: if isSignedIn();
-        allow update, delete: if false; // Audit logs are strictly immutable
+        allow update, delete: if false;
       }
     }
 
-    // Default deny for unmapped root paths
+    // ---------- Platform Analytics (derived, backend-written) ----------
+    match /platformAnalytics/{societyId} {
+      allow read: if isPlatformAdmin() || isSocietyAdmin(societyId);
+      allow write: if false;
+    }
+
+    // ---------- Support Sessions ----------
+    match /supportSessions/{sessionId} {
+      allow read, write: if isPlatformAdmin();
+    }
+
+    // ---------- Platform Audit ----------
+    match /platformAuditLogs/{logId} {
+      allow read, write: if isPlatformAdmin();
+    }
+
+    // ---------- Default deny ----------
     match /{document=**} {
       allow read, write: if false;
     }

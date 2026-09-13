@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { RoleSwitcher } from './components/common/RoleSwitcher';
 import { ResidentApp } from './features/resident/ResidentApp';
@@ -9,6 +9,9 @@ import { ProfileCompletionModal } from './components/auth/ProfileCompletionModal
 import { SocietyElectionModal } from './features/election/SocietyElectionModal';
 import { IndianPaymentsResearchModal } from './components/payment/IndianPaymentsResearchModal';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { SocietyPicker } from './components/auth/SocietyPicker';
+import { JoinSociety } from './components/auth/JoinSociety';
+import { SocietyOnboarding } from './features/admin/SocietyOnboarding';
 import { PlatformAdminDashboard } from './features/platform/PlatformAdminDashboard';
 import { Wifi, Battery, Signal, CheckCircle, Info } from 'lucide-react';
 
@@ -16,6 +19,9 @@ const AppContent: React.FC = () => {
   const {
     role,
     userProfile,
+    currentSocietyId,
+    currentSociety,
+    isPlatformAdmin,
     activeView,
     previewMode,
     isAuthModalOpen,
@@ -48,7 +54,39 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Tenant gate: authenticated users without a selected society pick or join one.
+  // Platform admins may enter the console directly.
+  if (!currentSocietyId && activeView !== 'platform_admin') {
+    return <PickerGate />;
+  }
+
+  // Suspended societies are blocked from normal operation.
+  if (currentSociety?.status === 'suspended' && activeView !== 'platform_admin') {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center mx-auto">
+            <span className="text-2xl">⛔</span>
+          </div>
+          <h1 className="text-lg font-extrabold text-slate-900">
+            {currentSociety.name} is suspended
+          </h1>
+          <p className="text-sm text-slate-500">
+            This society is currently suspended. Please contact NestWell support.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const isMobileFrame = previewMode === 'mobile_frame';
+
+  // Society onboarding: pending/onboarding societies show the setup wizard
+  // to society admins (or platform admins in support) instead of the dashboard.
+  const needsOnboarding =
+    currentSociety != null &&
+    (currentSociety.status === 'pending_admin' || currentSociety.status === 'onboarding') &&
+    (role === 'admin' || isPlatformAdmin);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
@@ -56,6 +94,8 @@ const AppContent: React.FC = () => {
 
       {activeView === 'platform_admin' ? (
         <PlatformAdminDashboard />
+      ) : needsOnboarding ? (
+        <SocietyOnboarding />
       ) : role === 'admin' ? (
         <div className="flex-1 bg-slate-100">
           <AdminLayout />
@@ -140,6 +180,14 @@ const AppContent: React.FC = () => {
       )}
     </div>
   );
+};
+
+const PickerGate: React.FC = () => {
+  const [joining, setJoining] = useState(false);
+  if (joining) {
+    return <JoinSociety onBack={() => setJoining(false)} onJoined={() => setJoining(false)} />;
+  }
+  return <SocietyPicker onJoin={() => setJoining(true)} />;
 };
 
 export default function App() {

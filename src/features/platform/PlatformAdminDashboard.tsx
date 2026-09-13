@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { createSocietyInvite } from '../../lib/firestoreService';
 import { Society, SocietyStatus } from '../../types';
 import {
   Building2,
@@ -19,6 +20,9 @@ import {
   Lock,
   Eye,
   RefreshCw,
+  Mail,
+  Copy,
+  Send,
 } from 'lucide-react';
 
 export const PlatformAdminDashboard: React.FC = () => {
@@ -31,6 +35,8 @@ export const PlatformAdminDashboard: React.FC = () => {
     startSupportSession,
     supportSessions,
     platformAnalytics,
+    platformUser,
+    user,
     auditLogs,
     showToast,
   } = useApp();
@@ -41,6 +47,13 @@ export const PlatformAdminDashboard: React.FC = () => {
   const [selectedSocietyForSupport, setSelectedSocietyForSupport] = useState<Society | null>(null);
   const [supportReason, setSupportReason] = useState('');
 
+  // Invite Society Admin state (shown right after society creation)
+  const [createdSociety, setCreatedSociety] = useState<Society | null>(null);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
+  const [copied, setCopied] = useState(false);
   // New Society form state
   const [newName, setNewName] = useState('');
   const [newLegalName, setNewLegalName] = useState('');
@@ -79,7 +92,7 @@ export const PlatformAdminDashboard: React.FC = () => {
         legalName: newLegalName.trim() || `${newName.trim()} Apartment Owners Association`,
         city: newCity.trim(),
         address: newAddress.trim() || `${newName.trim()}, ${newCity.trim()}`,
-        status: 'active',
+        status: 'pending_admin',
         features: {
           visitorManagement: featureVisitors,
           facilityBooking: featureFacilities,
@@ -89,17 +102,56 @@ export const PlatformAdminDashboard: React.FC = () => {
           notices: featureNotices,
         },
       });
-      showToast(`Society tenant "${created.name}" provisioned in Cloud Firestore.`);
+      showToast(`Society "${created.name}" created. Next: invite a Society Administrator.`);
       setIsCreateModalOpen(false);
       setNewName('');
       setNewLegalName('');
       setNewCity('');
       setNewAddress('');
+      // Open the invite-admin step immediately
+      setCreatedSociety(created);
+      setInviteEmail('');
+      setInviteCode(null);
+      setIsInviteModalOpen(true);
     } catch (err) {
       console.error(err);
       showToast('Error creating society tenant.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleInviteAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createdSociety || !inviteEmail.trim()) {
+      showToast('Administrator email is required.');
+      return;
+    }
+    setIsInviting(true);
+    try {
+      const invite = await createSocietyInvite(createdSociety.id, {
+        email: inviteEmail.trim(),
+        intendedRole: 'society_admin',
+        createdBy: user?.uid || platformUser?.id || 'platform-admin',
+      });
+      setInviteCode(invite.id);
+      showToast(`Invitation created for ${invite.email}. Share the code with them.`);
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Failed to create invitation.');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleCopyCode = async () => {
+    if (!inviteCode) return;
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast('Copy failed. Please select the code manually.');
     }
   };
 
@@ -148,7 +200,7 @@ export const PlatformAdminDashboard: React.FC = () => {
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                 Platform Super Admin
               </span>
-              <span className="text-xs text-slate-400">Authenticated: sghazra21@gmail.com</span>
+              <span className="text-xs text-slate-400">Authenticated: {user?.email || platformUser?.email || ''}</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight mt-1 text-white">
               NestWell Multi-Tenant Console
@@ -284,6 +336,19 @@ export const PlatformAdminDashboard: React.FC = () => {
                         )}
                       </td>
                       <td className="px-5 py-4 text-right space-x-2">
+                        {soc.status === 'pending_admin' && (
+                          <button
+                            onClick={() => {
+                              setCreatedSociety(soc);
+                              setInviteEmail('');
+                              setInviteCode(null);
+                              setIsInviteModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                          >
+                            <Send className="w-3.5 h-3.5" /> Invite Admin
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setSelectedSocietyForSupport(soc);
@@ -470,6 +535,87 @@ export const PlatformAdminDashboard: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Society Admin Modal */}
+      {isInviteModalOpen && createdSociety && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white">Invite Society Administrator</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {createdSociety.name} • {createdSociety.city}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsInviteModalOpen(false)}
+                className="text-slate-400 hover:text-white text-sm font-semibold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {!inviteCode ? (
+              <form onSubmit={handleInviteAdmin} className="space-y-3">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  The administrator will sign in (or create an account) with this email,
+                  then enter the invitation code to become Society Admin.
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Administrator Email *
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="admin@example.com"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isInviting}
+                  className="w-full px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                >
+                  {isInviting ? 'Creating invitation…' : 'Send Invitation'}
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-center">
+                  <p className="text-[11px] uppercase tracking-wider text-emerald-400 font-bold mb-1">
+                    Invitation code
+                  </p>
+                  <p className="text-2xl font-mono font-black text-white tracking-wider">
+                    {inviteCode}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Valid for 7 days • Single use • Expires after acceptance
+                  </p>
+                </div>
+                <button
+                  onClick={handleCopyCode}
+                  className="w-full px-5 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copied ? 'Copied!' : 'Copy code'}
+                </button>
+                <button
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="w-full text-center text-xs text-slate-400 hover:text-white py-1"
+                >
+                  Done
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

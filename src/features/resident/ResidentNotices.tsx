@@ -5,7 +5,7 @@ import { Modal } from '../../components/common/Modal';
 import { Bell, Calendar, ChevronRight, FileText, AlertCircle, Sparkles, Building } from 'lucide-react';
 
 export const ResidentNotices: React.FC = () => {
-  const { notices } = useApp();
+  const { notices, currentSociety } = useApp();
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
 
   const getNoticeIcon = (category: string) => {
@@ -25,7 +25,7 @@ export const ResidentNotices: React.FC = () => {
       <div className="flex items-center justify-between pt-1">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Community Notices</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Official circulars from Greenwood Heights RWA</p>
+          <p className="text-xs text-slate-500 mt-0.5">Official circulars from {currentSociety?.name || 'your society'}</p>
         </div>
         <span className="px-2.5 py-1 rounded-full bg-teal-100 text-teal-800 text-xs font-bold">
           {notices.length} active

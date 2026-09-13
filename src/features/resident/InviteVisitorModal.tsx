@@ -11,7 +11,7 @@ interface InviteVisitorModalProps {
 }
 
 export const InviteVisitorModal: React.FC<InviteVisitorModalProps> = ({ isOpen, onClose }) => {
-  const { inviteVisitor, cancelVisitorPass, resident } = useApp();
+  const { inviteVisitor, cancelVisitorPass, resident, currentSociety } = useApp();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -224,7 +224,7 @@ export const InviteVisitorModal: React.FC<InviteVisitorModalProps> = ({ isOpen, 
           {/* Pass Card */}
           <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
             <div>
-              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Greenwood Heights Gate Pass</span>
+              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">{currentSociety?.name || 'Society'} Gate Pass</span>
               <h4 className="text-2xl font-bold text-slate-900 mt-1">{generatedPass.name}</h4>
               <p className="text-sm font-medium text-slate-600">
                 Visiting Flat <strong className="text-slate-900">{generatedPass.flat}</strong> ({resident.name})

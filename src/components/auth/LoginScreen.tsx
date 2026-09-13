@@ -7,7 +7,6 @@ import {
   googleProvider,
 } from '../../lib/firebase';
 import { useApp } from '../../context/AppContext';
-import { UserRole } from '../../types';
 import {
   Building2,
   ShieldCheck,
@@ -16,20 +15,15 @@ import {
   User,
   ArrowRight,
   Shield,
-  Home,
   CheckCircle2,
   AlertCircle,
   KeyRound,
   Sparkles,
   Users,
-  Smartphone,
-  ExternalLink,
 } from 'lucide-react';
 
 export const LoginScreen: React.FC = () => {
   const {
-    loginAsLocalAdmin,
-    loginWithDemoAccount,
     showToast,
   } = useApp();
 
@@ -50,7 +44,7 @@ export const LoginScreen: React.FC = () => {
     } catch (err: any) {
       console.warn('Google sign-in error:', err);
       if (err.code === 'auth/popup-blocked' || err.message?.includes('popup')) {
-        setError('Google popup was blocked by browser. Please allow popups or use Email / Local Admin below.');
+        setError('Google popup was blocked by browser. Please allow popups or use email sign-in below.');
       } else {
         setError(err.message || 'Failed to sign in with Google.');
       }
@@ -76,15 +70,6 @@ export const LoginScreen: React.FC = () => {
         await createUserWithEmailAndPassword(auth, email.trim(), password);
         showToast('Account created! Please complete your society profile.');
       } else {
-        // Special check: If user typed the local admin credentials into the email form
-        if (
-          email.trim().toLowerCase() === 'admin@greenwood.in' &&
-          (password === 'admin123' || password === 'admin@greenwood')
-        ) {
-          loginAsLocalAdmin();
-          return;
-        }
-
         await signInWithEmailAndPassword(auth, email.trim(), password);
         showToast('Signed in successfully.');
       }
@@ -96,7 +81,7 @@ export const LoginScreen: React.FC = () => {
         err.code === 'auth/wrong-password' ||
         err.code === 'auth/invalid-credential'
       ) {
-        msg = 'Invalid credentials. You can use the 1-click Local Admin or Demo accounts below.';
+        msg = 'Invalid email or password. Please try again.';
       } else if (err.code === 'auth/email-already-in-use') {
         msg = 'This email is already registered. Please switch to Sign In.';
       }
@@ -104,13 +89,6 @@ export const LoginScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFillAdminCredentials = () => {
-    setEmail('admin@greenwood.in');
-    setPassword('admin123');
-    setAuthMode('signin');
-    showToast('Admin credentials filled. Click "Sign In" or use 1-Click Super Admin below.');
   };
 
   return (
@@ -124,9 +102,9 @@ export const LoginScreen: React.FC = () => {
             </div>
             <div>
               <h1 className="font-extrabold text-base sm:text-lg tracking-tight text-white flex items-center gap-2">
-                Greenwood Heights <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">RWA Portal</span>
+                NestWell <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">Society Platform</span>
               </h1>
-              <p className="text-[11px] text-slate-400">Co-operative Housing Society • Reg No: BOM/HSG/TC/12098</p>
+              <p className="text-[11px] text-slate-400">Multi-society management & gate security</p>
             </div>
           </div>
 
@@ -151,7 +129,7 @@ export const LoginScreen: React.FC = () => {
           </h2>
 
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-            Welcome to the Greenwood Heights digital community gateway. Manage gate visitors, pay maintenance dues via UPI, cast election votes, and administer society operations securely.
+            Welcome to the NestWell society gateway. Manage gate visitors, pay maintenance dues, cast election votes, and administer society operations securely.
           </p>
 
           {/* Feature highlights */}
@@ -203,31 +181,6 @@ export const LoginScreen: React.FC = () => {
           <div className="bg-slate-900/90 rounded-3xl border border-slate-700 shadow-2xl p-6 sm:p-8 backdrop-blur-xl relative overflow-hidden">
             {/* Ambient decorative glow */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            {/* Local Admin Banner Card */}
-            <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-purple-950/80 border border-indigo-500/40 shadow-inner relative">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-300 font-bold text-[10px] uppercase tracking-wider mb-1">
-                    <ShieldCheck className="w-3 h-3" />
-                    <span>Local Super Admin Account</span>
-                  </div>
-                  <h4 className="text-sm font-bold text-white">Full Society Administration</h4>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Credentials: <span className="font-mono font-semibold text-indigo-300">admin@greenwood.in</span> / <span className="font-mono font-semibold text-indigo-300">admin123</span>
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={loginAsLocalAdmin}
-                  className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 shrink-0 transition-all flex items-center gap-1.5 active:scale-95"
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>Login as Admin</span>
-                </button>
-              </div>
-            </div>
 
             {/* Form Mode Toggle */}
             <div className="grid grid-cols-2 p-1 bg-slate-950/80 rounded-xl mb-5 text-xs font-bold border border-slate-800">
@@ -346,15 +299,6 @@ export const LoginScreen: React.FC = () => {
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">
                     Password
                   </label>
-                  {authMode === 'signin' && (
-                    <button
-                      type="button"
-                      onClick={handleFillAdminCredentials}
-                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
-                    >
-                      Fill Admin Creds
-                    </button>
-                  )}
                 </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -384,57 +328,13 @@ export const LoginScreen: React.FC = () => {
                 )}
               </button>
             </form>
-
-            {/* Instant Role Preview Options */}
-            <div className="mt-5 pt-4 border-t border-slate-800">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2.5 text-center">
-                One-Click Quick Evaluation Profiles
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => loginWithDemoAccount('resident')}
-                  className="p-2.5 rounded-xl border border-slate-800 hover:border-indigo-500 bg-slate-950/60 hover:bg-indigo-950/30 text-left transition-all group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px] font-bold mb-1">
-                    B-4
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-200 group-hover:text-indigo-300">Resident</div>
-                  <div className="text-[9px] text-slate-400">Flat B-402</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => loginWithDemoAccount('admin')}
-                  className="p-2.5 rounded-xl border border-slate-800 hover:border-purple-500 bg-slate-950/60 hover:bg-purple-950/30 text-left transition-all group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold mb-1">
-                    RWA
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-200 group-hover:text-purple-300">Society Admin</div>
-                  <div className="text-[9px] text-slate-400">Full Rights</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => loginWithDemoAccount('security')}
-                  className="p-2.5 rounded-xl border border-slate-800 hover:border-amber-500 bg-slate-950/60 hover:bg-amber-950/30 text-left transition-all group"
-                >
-                  <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold mb-1">
-                    G-1
-                  </div>
-                  <div className="text-[11px] font-bold text-slate-200 group-hover:text-amber-300">Security Guard</div>
-                  <div className="text-[9px] text-slate-400">Gate Console</div>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950/80 px-6 py-4 text-center text-xs text-slate-400">
-        <p>Greenwood Heights RWA • All Society Records Encrypted & Verified under Model Bylaws</p>
+        <p>NestWell • Secure society management platform</p>
       </footer>
     </div>
   );

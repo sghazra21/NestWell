@@ -22,6 +22,7 @@ export const ResidentMore: React.FC = () => {
   const {
     resident,
     userProfile,
+    currentSociety,
     setRole,
     setIsElectionModalOpen,
     setIsPaymentsResearchOpen,
@@ -258,7 +259,7 @@ export const ResidentMore: React.FC = () => {
           isOpen={true}
           onClose={() => setActiveModal(null)}
           title={activeModal.charAt(0).toUpperCase() + activeModal.slice(1)}
-          subtitle="Greenwood Heights RWA"
+          subtitle={currentSociety?.name || 'Society'}
           maxWidth="sm"
         >
           <div className="p-4 text-center space-y-3">

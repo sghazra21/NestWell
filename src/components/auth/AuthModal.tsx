@@ -7,17 +7,12 @@ import {
   googleProvider,
 } from '../../lib/firebase';
 import { useApp } from '../../context/AppContext';
-import { UserRole } from '../../types';
 import {
-  ShieldCheck,
   Mail,
   Lock,
   User,
   ArrowRight,
-  Sparkles,
   Building,
-  Shield,
-  KeyRound,
   AlertCircle,
   X,
 } from 'lucide-react';
@@ -33,7 +28,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   initialMode = 'signin',
 }) => {
-  const { loginWithDemoAccount, showToast } = useApp();
+  const { showToast } = useApp();
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -87,7 +82,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.error('Auth error:', err);
       let msg = err.message || 'Authentication failed.';
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        msg = 'Invalid email or password. You can also try Demo One-Click Login below.';
+        msg = 'Invalid email or password. Please try again.';
       } else if (err.code === 'auth/email-already-in-use') {
         msg = 'An account with this email already exists. Please switch to Sign In.';
       }
@@ -95,12 +90,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickDemoLogin = (role: UserRole) => {
-    loginWithDemoAccount(role);
-    showToast(`Switched to active ${role.toUpperCase()} account.`);
-    onClose();
   };
 
   return (
@@ -118,7 +107,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-xs">
               <Building className="w-4 h-4 text-white" />
             </div>
-            <span className="text-xs font-bold tracking-wider uppercase text-indigo-400">Greenwood Heights RWA</span>
+            <span className="text-xs font-bold tracking-wider uppercase text-indigo-400">NestWell</span>
           </div>
           <h3 className="text-2xl font-extrabold tracking-tight">
             {mode === 'signin' ? 'Welcome Back' : 'Create Society Account'}
@@ -276,50 +265,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
             </button>
           </form>
-
-          {/* Quick Demo Login Preset Options */}
-          <div className="pt-2 border-t border-slate-100">
-            <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">
-              Quick Test / Instant Demo Profiles
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('resident')}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 text-left transition-all group"
-              >
-                <div className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold mb-1">
-                  B-4
-                </div>
-                <div className="text-[11px] font-bold text-slate-900 group-hover:text-indigo-700">Resident</div>
-                <div className="text-[9px] text-slate-500">Flat B-402</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('admin')}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 text-left transition-all group"
-              >
-                <div className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold mb-1">
-                  RWA
-                </div>
-                <div className="text-[11px] font-bold text-slate-900 group-hover:text-indigo-700">Admin</div>
-                <div className="text-[9px] text-slate-500">Management</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('security')}
-                className="p-2.5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50/40 text-left transition-all group"
-              >
-                <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold mb-1">
-                  G-1
-                </div>
-                <div className="text-[11px] font-bold text-slate-900 group-hover:text-indigo-700">Security</div>
-                <div className="text-[9px] text-slate-500">Gate Terminal</div>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

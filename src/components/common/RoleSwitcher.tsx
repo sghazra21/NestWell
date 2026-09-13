@@ -6,23 +6,18 @@ import {
   LayoutDashboard,
   Smartphone,
   Monitor,
-  BellRing,
-  RotateCcw,
   Vote,
   CreditCard,
   User,
   LogOut,
   Sparkles,
-  Lock,
   Building2,
   Layers,
 } from 'lucide-react';
-import { UserRole } from '../../types';
 
 export const RoleSwitcher: React.FC = () => {
   const {
     role,
-    setRole,
     user,
     userProfile,
     isPlatformAdmin,
@@ -39,35 +34,20 @@ export const RoleSwitcher: React.FC = () => {
     logout,
     previewMode,
     setPreviewMode,
-    triggerGateSimulation,
-    resetData,
-    showToast,
   } = useApp();
 
-  const roles: { id: UserRole; label: string; icon: React.ReactNode; desc: string }[] = [
-    {
-      id: 'resident',
-      label: 'Resident App',
-      icon: <Home className="w-4 h-4" />,
-      desc: 'Mobile App (Sayan Ghosh, B-402)',
-    },
-    {
-      id: 'security',
-      label: 'Security Guard',
-      icon: <Shield className="w-4 h-4" />,
-      desc: 'Gate 1 Fast Tablet / Phone Console',
-    },
-    {
-      id: 'admin',
-      label: 'Society Admin',
-      icon: <LayoutDashboard className="w-4 h-4" />,
-      desc: '1440px Web Dashboard & Bulk Operations',
-    },
-  ];
+  const roleLabel =
+    role === 'admin'
+      ? 'Society Admin'
+      : role === 'security'
+        ? 'Security'
+        : role === 'committee'
+          ? 'Committee'
+          : 'Resident';
 
   return (
     <aside
-      aria-label="Prototype demo control bar"
+      aria-label="Application navigation bar"
       className="sticky top-0 z-50 bg-[#091426] text-white border-b border-slate-800 shadow-md text-xs select-none"
     >
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2.5">
@@ -90,41 +70,17 @@ export const RoleSwitcher: React.FC = () => {
           </div>
 
           <span className="font-bold text-indigo-400 uppercase tracking-wider text-[11px] hidden sm:inline">
-            Active Role:
+            Your Role:
           </span>
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 shadow-inner">
-            {roles.map((r) => {
-              const active = activeView === 'app' && role === r.id;
-              const isAllowedAdmin = userProfile?.role === 'admin' || userProfile?.id === 'admin-local-master' || isPlatformAdmin;
-              const isLocked = r.id === 'admin' && !isAllowedAdmin;
-
-              return (
-                <button
-                  key={r.id}
-                  id={`role-btn-${r.id}`}
-                  onClick={() => {
-                    setActiveView('app');
-                    if (isLocked) {
-                      showToast('Administrative privileges required. Please contact a Society Admin.');
-                      return;
-                    }
-                    setRole(r.id);
-                  }}
-                  title={isLocked ? 'Restricted to designated Society Admins' : r.desc}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-                    active
-                      ? 'bg-indigo-600 text-white shadow-sm font-semibold'
-                      : isLocked
-                      ? 'text-slate-500 hover:text-slate-400 opacity-60'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  {r.icon}
-                  <span>{r.label}</span>
-                  {isLocked && <Lock className="w-3 h-3 text-amber-400/80 shrink-0" />}
-                </button>
-              );
-            })}
+          <div className="flex items-center bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-700/60 shadow-inner">
+            {role === 'admin' ? (
+              <LayoutDashboard className="w-4 h-4 text-purple-400" />
+            ) : role === 'security' ? (
+              <Shield className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Home className="w-4 h-4 text-indigo-400" />
+            )}
+            <span className="ml-1.5 font-semibold text-slate-200">{roleLabel}</span>
           </div>
 
           {/* Platform Super Admin Console button */}
@@ -168,18 +124,6 @@ export const RoleSwitcher: React.FC = () => {
           >
             <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
             <span>India Payments (UPI)</span>
-          </button>
-
-          {/* Gate scan simulation button */}
-          <button
-            id="simulate-gate-btn"
-            onClick={triggerGateSimulation}
-            title="Simulate security scanning a visitor pass at Gate 1"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 font-semibold transition-colors shadow-xs"
-          >
-            <BellRing className="w-3.5 h-3.5 animate-bounce text-orange-400" />
-            <span className="hidden sm:inline">Simulate Gate Scan</span>
-            <span className="sm:hidden">Gate Scan</span>
           </button>
 
           {/* Firebase Authentication & User Profile Button */}
@@ -252,16 +196,6 @@ export const RoleSwitcher: React.FC = () => {
               </button>
             </div>
           )}
-
-          {/* Reset Demo State */}
-          <button
-            id="reset-demo-btn"
-            onClick={resetData}
-            title="Reset prototype state to initial defaults"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </aside>

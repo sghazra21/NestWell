@@ -24,19 +24,21 @@ export const IndianPaymentsResearchModal: React.FC<IndianPaymentsResearchModalPr
   isOpen,
   onClose,
 }) => {
-  const { resident, showToast } = useApp();
+  const { resident, showToast, currentSociety } = useApp();
   const [copied, setCopied] = useState(false);
-  const [testAmount, setTestAmount] = useState('4600');
-  const [testFlat, setTestFlat] = useState(resident.flat || 'B-402');
+  const [testAmount, setTestAmount] = useState('');
+  const [testFlat, setTestFlat] = useState(resident.flat || '');
 
   if (!isOpen) return null;
 
-  const upiVpa = 'greenwoodrwa@sbi';
-  const payeeName = 'Greenwood Heights RWA';
-  const transactionNote = `Maintenance_${testFlat}_Sep2026`;
-  const upiIntentUri = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(
-    payeeName
-  )}&am=${testAmount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+  const upiVpa = '';
+  const payeeName = currentSociety?.name || 'Society';
+  const transactionNote = `Maintenance_${testFlat}`;
+  const upiIntentUri = upiVpa
+    ? `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(
+      payeeName
+    )}&am=${testAmount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
+    : '';
 
   const handleCopyIntent = () => {
     navigator.clipboard.writeText(upiIntentUri);
@@ -180,7 +182,7 @@ export const IndianPaymentsResearchModal: React.FC<IndianPaymentsResearchModalPr
                     </span>
                   </div>
                   <p className="text-slate-600 text-[11px] mb-2">
-                    Allows residents to see their Greenwood Heights society maintenance bill directly inside banking apps (HDFC, ICICI, SBI) alongside their electricity and water bills.
+                    Allows residents to see their society maintenance bill directly inside banking apps (HDFC, ICICI, SBI) alongside their electricity and water bills.
                   </p>
                 </div>
                 <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
 import { Building, Shield, Landmark, Users, Save, Check } from 'lucide-react';
 
 export const AdminSettings: React.FC = () => {
+  const { currentSociety } = useApp();
   const [savedNotice, setSavedNotice] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
@@ -36,7 +38,7 @@ export const AdminSettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                defaultValue="Greenwood Heights Apartment Owners Association"
+                defaultValue={currentSociety?.legalName || currentSociety?.name || ''}
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-semibold"
               />
             </div>

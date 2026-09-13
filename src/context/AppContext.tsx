@@ -46,10 +46,13 @@ import {
   createTowerRecord,
   subscribeFlats,
   createFlatRecord,
+  createFacilityRecord,
   updateFlatRecord,
   subscribeMembers,
   createOrUpdateMemberRecord,
   updateMemberRole as updateMemberRoleInDb,
+  updateMemberStatus as updateMemberStatusInDb,
+  createSocietyInvite,
   subscribeVisitors,
   createVisitorRecord,
   updateVisitorStatusRecord,
@@ -75,7 +78,6 @@ import {
   subscribePlatformAnalytics,
   subscribeSupportSessions,
   createSupportSessionRecord,
-  bootstrapProductionTenantIfEmpty,
   sanitizeFirestoreData,
 } from '../lib/firestoreService';
 
@@ -97,6 +99,7 @@ interface AppContextType {
   updateSocietyStatus: (societyId: string, status: Society['status']) => Promise<void>;
   createTower: (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Tower>;
   createFlat: (data: Omit<Flat, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Flat>;
+  createFacility: (data: Omit<Facility, 'id' | 'societyId'>) => Promise<Facility>;
   updateFlat: (flatId: string, data: Partial<Flat>) => Promise<void>;
   startSupportSession: (societyId: string, reason: string) => Promise<void>;
   supportSessions: SupportSession[];
@@ -116,15 +119,15 @@ interface AppContextType {
   setIsElectionModalOpen: (open: boolean) => void;
   isPaymentsResearchOpen: boolean;
   setIsPaymentsResearchOpen: (open: boolean) => void;
-  loginWithDemoAccount: (role: UserRole) => void;
-  loginAsLocalAdmin: () => void;
   promoteToSocietyAdmin: (targetIdentifier: string, newRole: UserRole, designation?: string) => Promise<void>;
+  setMemberStatus: (uid: string, status: 'active' | 'suspended' | 'removed') => Promise<void>;
+  inviteMember: (email: string, intendedRole: 'resident' | 'security' | 'committee' | 'society_admin', flatId?: string) => Promise<string>;
   registeredUsers: UserProfile[];
   completeUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
 
   // Backwards-Compatible Entity State & Handlers
-  society: SocietyInfo;
+  society: SocietyInfo | null;
   resident: ResidentProfile;
   setResident: React.Dispatch<React.SetStateAction<ResidentProfile>>;
   residents: ResidentProfile[];
@@ -156,6 +159,7 @@ interface AppContextType {
   addComplaintComment: (id: string, text: string) => void;
   bills: MaintenanceBill[];
   payMaintenanceBill: (billId: string, paymentMethod: string) => { receiptNumber: string; transactionId: string };
+  markBillPaidManually: (billId: string, method: string) => Promise<void>;
   facilities: Facility[];
   bookFacilitySlot: (facilityId: string, slotTime: string, date: string) => boolean;
   notices: Notice[];
@@ -196,21 +200,21 @@ interface AppContextType {
     visitor?: Visitor;
     message?: string;
   };
-  triggerGateSimulation: () => void;
   dismissGateAlert: () => void;
   previewMode: 'auto' | 'mobile_frame';
   setPreviewMode: (mode: 'auto' | 'mobile_frame') => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
-  resetData: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Multi-Tenant Context State
+  // No default society: empty string means "no tenant selected".
+  // A society exists only if a real Platform Admin creates it.
   const [currentSocietyId, setCurrentSocietyIdState] = useState<string>(() => {
-    return localStorage.getItem('nestwell_current_society_id') || 'greenwood-heights';
+    return localStorage.getItem('nestwell_current_society_id') || '';
   });
   const [currentSociety, setCurrentSociety] = useState<Society | null>(null);
   const [societies, setSocieties] = useState<Society[]>([]);
@@ -223,15 +227,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // Auth & Global User state
+  // userProfile and role are resolved from Firebase Auth + society membership.
+  // localStorage is never trusted for authentication or authorization.
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [platformUser, setPlatformUser] = useState<PlatformUser | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('nestwell_user_profile');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [role, setRoleState] = useState<UserRole>(() => {
-    return (localStorage.getItem('nestwell_role') as UserRole) || 'resident';
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [role, setRoleState] = useState<UserRole>('resident');
   const [activeView, setActiveView] = useState<'app' | 'platform_admin'>('app');
 
   // Modals & Navigation
@@ -253,25 +254,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
 
-  // Dynamic Resident Profile for current user
+  // Resident profile for the current user, populated from society membership.
+  // Empty until the user's membership and flat assignment resolve.
   const [resident, setResident] = useState<ResidentProfile>({
-    id: 'res-user',
-    name: 'Sayan Ghosh',
-    flat: 'B-402',
-    tower: 'Tower B',
-    phone: '+91 98765 43210',
-    email: 'sayan.ghosh@greenwood.in',
+    id: '',
+    name: '',
+    flat: '',
+    tower: '',
+    phone: '',
+    email: '',
     type: 'Owner',
-    status: 'Active',
-    familyMembers: [
-      { name: 'Pooja Ghosh', relation: 'Spouse' },
-      { name: 'Aarav Ghosh', relation: 'Son' },
-    ],
-    vehicles: [
-      { number: 'KA 03 MX 8412', type: 'Car', slot: 'B-P12' },
-      { number: 'KA 03 EV 2109', type: 'Two-Wheeler', slot: 'B-T04' },
-    ],
-    dues: 4600,
+    status: 'Pending Verification',
+    familyMembers: [],
+    vehicles: [],
+    dues: 0,
   });
 
   // Dynamic gate alert state
@@ -290,11 +286,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 3500);
   };
 
-  const isPlatformAdmin =
-    platformUser?.platformRole === 'platform_admin' ||
-    user?.email?.toLowerCase() === 'sghazra21@gmail.com' ||
-    userProfile?.email?.toLowerCase() === 'sghazra21@gmail.com' ||
-    userProfile?.id === 'admin-local-master';
+  // Platform admin is resolved ONLY from the platformUsers document.
+  // Never from email allowlists, localStorage, or client-side flags.
+  const isPlatformAdmin = platformUser?.platformRole === 'platform_admin';
 
   const setCurrentSocietyId = (newId: string) => {
     setCurrentSocietyIdState(newId);
@@ -308,17 +302,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     setRoleState(newRole);
-    localStorage.setItem('nestwell_role', newRole);
     showToast(`Switched interface to ${newRole.charAt(0).toUpperCase() + newRole.slice(1)} view`);
   };
 
   // -------------------------------------------------------------
-  // 1. INITIAL MOUNT & BOOTSTRAP (Zero mock data in code)
+  // 1. INITIAL MOUNT & AUTH (no seeding, no mock data)
   // -------------------------------------------------------------
   useEffect(() => {
-    // Bootstrap Firestore with real production tenant if completely empty
-    bootstrapProductionTenantIfEmpty();
-
     // Listen to Firebase Auth state
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       setUser(fbUser);
@@ -327,31 +317,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const pUser = await syncPlatformUser(fbUser);
           setPlatformUser(pUser);
 
-          // Build or sync profile
+          // Build profile from auth identity only.
+          // Role is resolved from society membership, not assigned here.
           const profile: UserProfile = {
             id: fbUser.uid,
             email: fbUser.email || '',
             name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Resident User',
-            role: fbUser.email?.toLowerCase() === 'sghazra21@gmail.com' ? 'admin' : 'resident',
+            role: 'resident',
             phone: fbUser.phoneNumber || '',
-            flat: 'B-402',
-            tower: 'Tower B',
+            flat: '',
+            tower: '',
             type: 'Owner',
-            isProfileComplete: true,
+            isProfileComplete: false,
             createdAt: new Date().toISOString(),
           };
           setUserProfile(profile);
-          localStorage.setItem('nestwell_user_profile', JSON.stringify(profile));
-
-          // Sync into society members
-          await createOrUpdateMemberRecord(currentSocietyId, {
-            uid: fbUser.uid,
-            email: profile.email,
-            name: profile.name,
-            role: fbUser.email?.toLowerCase() === 'sghazra21@gmail.com' ? 'society_admin' : 'resident',
-            flatNumber: profile.flat,
-            towerName: profile.tower,
-          });
         } catch (e) {
           console.warn('Auth sync notice:', e);
         }
@@ -403,7 +383,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (found) setCurrentMembership(found);
       }
     });
-
     // Visitors
     const unsubVisitors = subscribeVisitors(currentSocietyId, (vList) => {
       setVisitors(vList);
@@ -467,6 +446,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [currentSocietyId, user?.uid, resident.flat, role]);
 
+  // -------------------------------------------------------------
+  // 2b. ROLE DERIVATION (membership is authoritative)
+  // Role is derived from the user's membership in the current society.
+  // It is never set manually, never read from localStorage.
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (currentMembership) {
+      const mapped: UserRole =
+        currentMembership.role === 'society_admin'
+          ? 'admin'
+          : (currentMembership.role as UserRole);
+      setRoleState((prev) => (prev === mapped ? prev : mapped));
+      setUserProfile((prev) =>
+        prev && prev.role === mapped
+          ? prev
+          : prev
+            ? { ...prev, role: mapped }
+            : prev
+      );
+    }
+  }, [currentMembership]);
+
   // Derive registered users for AdminPeople table
   const registeredUsers: UserProfile[] = members.map((m) => ({
     id: m.uid,
@@ -482,56 +483,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createdAt: m.createdAt,
   }));
 
-  // Derive SocietyInfo for UI header
-  const society: SocietyInfo = currentSociety
+  // Derive SocietyInfo for UI header from the real society document.
+  // Null when no society is selected: the UI must render an empty state.
+  const society: SocietyInfo | null = currentSociety
     ? {
         name: currentSociety.name,
         subTitle: currentSociety.legalName,
         city: currentSociety.city,
-        registeredNumber: currentSociety.registeredNumber || 'RWA-BLR-2019-742',
-        totalFlats: currentSociety.totalFlats || flats.length || 144,
-        totalResidents: currentSociety.totalResidents || members.length || 480,
-        towers: towers.map((t) => t.name).length > 0 ? towers.map((t) => t.name) : ['Tower A', 'Tower B', 'Tower C'],
+        registeredNumber: currentSociety.registeredNumber || '',
+        totalFlats: currentSociety.totalFlats ?? flats.length,
+        totalResidents: currentSociety.totalResidents ?? members.length,
+        towers: towers.map((t) => t.name),
       }
-    : {
-        name: 'Greenwood Heights RWA',
-        subTitle: 'Greenwood Heights Apartment Owners Association',
-        city: 'Bengaluru, KA',
-        registeredNumber: 'RWA-BLR-2019-742',
-        totalFlats: 144,
-        totalResidents: 480,
-        towers: ['Tower A', 'Tower B', 'Tower C'],
-      };
+    : null;
 
-  // Derive CommitteeMembers
+  // Derive CommitteeMembers from real membership records only.
   const committeeMembers: CommitteeMember[] = members
     .filter((m) => m.role === 'committee' || m.role === 'society_admin')
     .map((m) => ({
       id: m.id,
       name: m.name,
       position: (m.designation as ElectionPosition) || 'President',
-      flat: m.flatNumber || 'A-101',
-      tower: m.towerName || 'Tower A',
-      phone: m.phone || '+91 98000 00000',
+      flat: m.flatNumber || '',
+      tower: m.towerName || '',
+      phone: m.phone || '',
       email: m.email,
-      term: '2026-2028',
-      responsibilities: ['Society Management', 'Executive Oversight'],
+      term: '',
+      responsibilities: [],
     }));
 
-  // Derive residents list
-  const residents: ResidentProfile[] = flats.map((f) => ({
-    id: f.id,
-    name: f.primaryResidentName || (f.ownerNames?.[0]) || 'Resident',
-    flat: f.number,
-    tower: f.towerName || 'Tower A',
-    phone: f.primaryResidentPhone || '+91 98000 00000',
-    email: `${f.number.toLowerCase()}@greenwood.in`,
-    type: 'Owner',
-    status: 'Active',
-    familyMembers: [],
-    vehicles: f.vehicles || [],
-    dues: f.dues || 0,
-  }));
+  // Derive residents list from real flats and member records.
+  const residents: ResidentProfile[] = flats.map((f) => {
+    const occupant = members.find(
+      (m) => m.flatId === f.id && (m.role === 'resident' || m.role === 'society_admin')
+    );
+    return {
+      id: f.id,
+      name: occupant?.name || f.primaryResidentName || f.ownerNames?.[0] || '',
+      flat: f.number,
+      tower: f.towerName || '',
+      phone: occupant?.phone || f.primaryResidentPhone || '',
+      email: occupant?.email || '',
+      type: 'Owner',
+      status: occupant ? 'Active' : 'Pending Verification',
+      familyMembers: [],
+      vehicles: f.vehicles || [],
+      dues: f.dues || 0,
+    };
+  });
 
   // Derive live Activity feed
   const activities: ActivityEvent[] = [
@@ -601,14 +600,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return createFlatRecord(currentSocietyId, data);
   };
 
+  const createFacility = async (data: Omit<Facility, 'id' | 'societyId'>) => {
+    return createFacilityRecord(currentSocietyId, data);
+  };
+
   const updateFlat = async (flatId: string, data: Partial<Flat>) => {
     await updateFlatRecord(currentSocietyId, flatId, data);
   };
 
   const startSupportSession = async (socId: string, reason: string) => {
+    if (!user?.uid || !user?.email) return;
     await createSupportSessionRecord({
-      platformAdminId: user?.uid || 'platform-admin',
-      platformAdminEmail: user?.email || 'sghazra21@gmail.com',
+      platformAdminId: user.uid,
+      platformAdminEmail: user.email,
       societyId: socId,
       societyName: societies.find((s) => s.id === socId)?.name || socId,
       reason,
@@ -648,6 +652,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Role updated to ${newRole.toUpperCase()} in Cloud Firestore.`);
   };
 
+  // Approve / suspend / remove a membership (join-request review)
+  const setMemberStatus = async (uid: string, status: 'active' | 'suspended' | 'removed') => {
+    await updateMemberStatusInDb(currentSocietyId, uid, status);
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: status === 'active' ? 'APPROVE_MEMBERSHIP' : 'UPDATE_MEMBERSHIP_STATUS',
+      targetType: 'SocietyMember',
+      targetId: uid,
+      reason: `Membership status set to ${status}`,
+    });
+    showToast(`Membership ${status === 'active' ? 'approved' : `marked ${status}`}.`);
+  };
+
+  // Invite a member by email; returns the invitation code to share
+  const inviteMember = async (
+    email: string,
+    intendedRole: 'resident' | 'security' | 'committee' | 'society_admin',
+    flatId?: string
+  ): Promise<string> => {
+    const invite = await createSocietyInvite(currentSocietyId, {
+      email,
+      intendedRole,
+      flatId,
+      createdBy: user?.uid || 'admin',
+    });
+    return invite.id;
+  };
+
   // Complete User Profile
   const completeUserProfile = async (updates: Partial<UserProfile>) => {
     if (!user?.uid) return;
@@ -659,7 +693,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } as UserProfile;
 
     setUserProfile(updated);
-    localStorage.setItem('nestwell_user_profile', JSON.stringify(updated));
 
     await createOrUpdateMemberRecord(currentSocietyId, {
       uid: user.uid,
@@ -675,80 +708,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Profile completed and saved to Firestore.');
   };
 
-  // Quick Account Switcher (Preconfigured Demo Sessions)
-  const loginWithDemoAccount = (targetRole: UserRole) => {
-    let mockProfile: UserProfile;
-    if (targetRole === 'admin') {
-      mockProfile = {
-        id: 'admin-alok',
-        email: 'president@greenwood.in',
-        name: 'Dr. Alok Nath Mukherjee',
-        role: 'admin',
-        designation: 'RWA President',
-        phone: '+91 98311 88442',
-        flat: 'A-701',
-        tower: 'Tower A',
-        type: 'Owner',
-        isProfileComplete: true,
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString(),
-      };
-    } else if (targetRole === 'security') {
-      mockProfile = {
-        id: 'sec-ramesh',
-        email: 'guard.gate1@greenwood.in',
-        name: 'Havildar Ramesh Yadav',
-        role: 'security',
-        gateNumber: 'Gate 1 - Main Entrance',
-        badgeId: 'SEC-042',
-        phone: '+91 98111 22334',
-        isProfileComplete: true,
-        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString(),
-      };
-    } else {
-      mockProfile = {
-        id: 'res-sayan-b402',
-        email: 'sayan.ghosh@greenwood.in',
-        name: 'Sayan Ghosh',
-        role: 'resident',
-        phone: '+91 98765 43210',
-        flat: 'B-402',
-        tower: 'Tower B',
-        type: 'Owner',
-        isProfileComplete: true,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        createdAt: new Date().toISOString(),
-      };
-    }
-
-    setUserProfile(mockProfile);
-    localStorage.setItem('nestwell_user_profile', JSON.stringify(mockProfile));
-    setRole(targetRole);
-  };
-
-  const loginAsLocalAdmin = () => {
-    const adminProfile: UserProfile = {
-      id: 'admin-local-master',
-      email: 'sghazra21@gmail.com',
-      name: 'Sayan Hazra (Super Admin)',
-      role: 'admin',
-      designation: 'Platform Super Admin & RWA Officer',
-      phone: '+91 98311 88442',
-      flat: 'B-402',
-      tower: 'Tower B',
-      type: 'Owner',
-      isProfileComplete: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    setUserProfile(adminProfile);
-    localStorage.setItem('nestwell_user_profile', JSON.stringify(adminProfile));
-    setRoleState('admin');
-    localStorage.setItem('nestwell_role', 'admin');
-    showToast('Logged in with Super Admin privileges (Cloud Firestore Authorized)');
-  };
-
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
@@ -757,7 +716,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setUser(null);
     setUserProfile(null);
-    localStorage.removeItem('nestwell_user_profile');
+    setPlatformUser(null);
+    setCurrentMembership(null);
+    setRoleState('resident');
+    localStorage.removeItem('nestwell_current_society_id');
+    setCurrentSocietyIdState('');
     showToast('Logged out of society account.');
   };
 
@@ -945,34 +908,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Payment Operations (Server-confirmed simulation)
+  // Resident-initiated payment: attempts server confirmation first.
+  // Until the Phase 12 payment backend exists, resident bill writes are
+  // rejected by security rules — surfaced as "not enabled", never faked.
   const payMaintenanceBill = (billId: string, paymentMethod: string) => {
     const receiptNumber = `RCP-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-    const transactionId = `TXN-UPI-${Math.floor(100000000 + Math.random() * 900000000)}`;
-
-    setBills((prev) =>
-      prev.map((b) =>
-        b.id === billId
-          ? {
-              ...b,
-              status: 'Paid',
-              paidAt: 'Just now',
-              paymentMethod,
-              transactionId,
-            }
-          : b
-      )
-    );
-
-    setResident((prev) => ({ ...prev, dues: 0 }));
+    const transactionId = `UTR-${Math.floor(100000000000 + Math.random() * 900000000000)}`;
+    const bill = bills.find((b) => b.id === billId);
 
     processServerConfirmedPayment(currentSocietyId, billId, {
       method: paymentMethod,
       transactionId,
-      amount: 4600,
-    }).catch((err) => console.warn('Firestore payment error:', err));
-
-    confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      amount: bill?.totalAmount || 0,
+    })
+      .then(() => {
+        setBills((prev) =>
+          prev.map((b) =>
+            b.id === billId
+              ? { ...b, status: 'Paid', paidAt: new Date().toISOString(), paymentMethod, transactionId }
+              : b
+          )
+        );
+        setResident((prev) => ({ ...prev, dues: 0 }));
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        showToast('Payment confirmed and recorded.');
+      })
+      .catch(() => {
+        showToast('Online payments are not yet enabled for this society. Please pay at the society office.');
+      });
     return { receiptNumber, transactionId };
+  };
+
+  // Admin records an offline payment (cash/cheque/bank transfer).
+  // Society admins may write bills per security rules; fully audited.
+  const markBillPaidManually = async (billId: string, method: string) => {
+    const transactionId = `OFFLINE-${Math.floor(100000 + Math.random() * 900000)}`;
+    await processServerConfirmedPayment(currentSocietyId, billId, {
+      method,
+      transactionId,
+      amount: bills.find((b) => b.id === billId)?.totalAmount || 0,
+    });
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'RECORD_OFFLINE_PAYMENT',
+      targetType: 'MaintenanceBill',
+      targetId: billId,
+      reason: `Offline payment recorded via ${method}`,
+    });
+    showToast('Offline payment recorded.');
   };
 
   // Facility Booking Operations
@@ -1032,18 +1017,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addResident = (newRes: Partial<ResidentProfile>) => {
+    if (!newRes.flat) {
+      showToast('Flat number is required.');
+      return;
+    }
     createFlatRecord(currentSocietyId, {
-      number: newRes.flat || 'A-101',
-      towerId: 'tower-a',
-      towerName: newRes.tower || 'Tower A',
-      floor: 1,
+      number: newRes.flat,
+      towerId: `tower-${(newRes.tower || 'A').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+      towerName: newRes.tower || '',
+      floor: parseInt((newRes.flat.match(/\d+/) || ['1'])[0].slice(0, -2) || '1', 10) || 1,
       type: '2BHK',
-      status: 'active',
+      status: 'vacant',
       ownerIds: [],
-      ownerNames: [newRes.name || 'Resident'],
+      ownerNames: newRes.name ? [newRes.name] : [],
       tenantIds: [],
-      primaryResidentName: newRes.name || 'Resident',
-      primaryResidentPhone: newRes.phone || '+91 99000 00000',
+      primaryResidentName: newRes.name || '',
+      primaryResidentPhone: newRes.phone || '',
       dues: 0,
     }).catch((err) => console.warn(err));
 
@@ -1097,29 +1086,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Gate simulation helper
-  const triggerGateSimulation = () => {
-    const sim = inviteVisitor({
-      name: 'Rahul Verma',
-      phone: '+91 98200 44112',
-      purpose: 'Personal Guest',
-      expectedDate: 'Today',
-      expectedTime: 'Now',
-    });
-    updateVisitorStatus(sim.id, 'waiting');
-    setGateAlert({
-      active: true,
-      visitor: { ...sim, status: 'waiting' },
-      message: 'Rahul Verma is waiting at Gate 1.',
-    });
-    showToast('Security guard simulated scan for Rahul Verma.');
-  };
-
   const dismissGateAlert = () => {
     setGateAlert({ active: false });
-  };
-
-  const resetData = () => {
-    showToast('Application state refreshed from Cloud Firestore.');
   };
 
   return (
@@ -1141,6 +1109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSocietyStatus,
         createTower,
         createFlat,
+        createFacility,
         updateFlat,
         startSupportSession,
         supportSessions,
@@ -1158,9 +1127,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsElectionModalOpen,
         isPaymentsResearchOpen,
         setIsPaymentsResearchOpen,
-        loginWithDemoAccount,
-        loginAsLocalAdmin,
         promoteToSocietyAdmin,
+        setMemberStatus,
+        inviteMember,
         registeredUsers,
         completeUserProfile,
         logout,
@@ -1182,6 +1151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addComplaintComment,
         bills,
         payMaintenanceBill,
+        markBillPaidManually,
         facilities,
         bookFacilitySlot,
         notices,
@@ -1197,13 +1167,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createElection,
         updateElectionStatus,
         gateAlert,
-        triggerGateSimulation,
         dismissGateAlert,
         previewMode,
         setPreviewMode,
         toastMessage,
         showToast,
-        resetData,
       }}
     >
       {children}

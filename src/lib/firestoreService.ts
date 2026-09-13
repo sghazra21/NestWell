@@ -14,13 +14,15 @@ import {
   writeBatch,
   increment,
 } from 'firebase/firestore';
-import { db, auth, FirebaseUser } from './firebase';
+import { db, auth, functions, FirebaseUser } from './firebase';
+import { httpsCallable } from 'firebase/functions';
 import {
   Society,
   Tower,
   Flat,
   SocietyMember,
   SocietyRole,
+  SocietyInvite,
   MembershipStatus,
   PlatformUser,
   PlatformAnalytics,
@@ -129,27 +131,19 @@ export async function syncPlatformUser(firebaseUser: FirebaseUser): Promise<Plat
     const userRef = doc(db, 'platformUsers', firebaseUser.uid);
     const snap = await getDoc(userRef);
 
-    const isPlatformSuperAdmin =
-      firebaseUser.email?.toLowerCase() === 'sghazra21@gmail.com' ||
-      firebaseUser.email?.toLowerCase() === 'admin@greenwood.in';
-
     if (snap.exists()) {
-      const existing = snap.data() as PlatformUser;
-      if (isPlatformSuperAdmin && existing.platformRole !== 'platform_admin') {
-        const updated = { ...existing, platformRole: 'platform_admin' as const };
-        await setDoc(userRef, updated, { merge: true });
-        return updated;
-      }
-      return existing;
+      return snap.data() as PlatformUser;
     }
 
+    // New users are NEVER granted platform_admin here.
+    // Platform Admin is assigned only via the trusted Admin SDK bootstrap script.
+    // New users start with no societies; they join via invitation or join request.
     const newUser: PlatformUser = {
       id: firebaseUser.uid,
       email: firebaseUser.email || '',
       name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Resident User'),
-      platformRole: isPlatformSuperAdmin ? 'platform_admin' : null,
-      societyIds: ['greenwood-heights'], // default initial tenant
-      currentSocietyId: 'greenwood-heights',
+      platformRole: null,
+      societyIds: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -416,7 +410,7 @@ export async function createOrUpdateMemberRecord(
         status: memberData.status || 'active',
         flatId: memberData.flatId || '',
         flatNumber: memberData.flatNumber || '',
-        towerName: memberData.towerName || 'Tower B',
+        towerName: memberData.towerName || '',
         type: memberData.type || 'Owner',
         designation: memberData.designation || 'Resident',
         profileComplete: memberData.profileComplete ?? true,
@@ -455,6 +449,243 @@ export async function updateMemberRole(
     await updateDoc(doc(db, 'societies', societyId, 'members', uid), clean);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function updateMemberStatus(
+  societyId: string,
+  uid: string,
+  status: MembershipStatus
+): Promise<void> {
+  const path = `societies/${societyId}/members/${uid}`;
+  try {
+    await updateDoc(doc(db, 'societies', societyId, 'members', uid), {
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+    if (status === 'active') {
+      await linkSocietyToPlatformUser(uid, societyId);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+// -------------------------------------------------------------
+// 4b. SOCIETY INVITES & JOIN WORKFLOWS
+// Invite code is the document ID (high-entropy, single-use secret).
+// Acceptance validates email match + expiry + pending status.
+// -------------------------------------------------------------
+
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 10; i++) {
+    suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `NW-${suffix}`;
+}
+
+export async function createSocietyInvite(
+  societyId: string,
+  data: { email: string; intendedRole: SocietyRole; flatId?: string; createdBy: string }
+): Promise<SocietyInvite> {
+  const code = generateInviteCode();
+  const path = `societyInvites/${code}`;
+  try {
+    const invite: SocietyInvite = {
+      id: code,
+      societyId,
+      email: data.email.trim().toLowerCase(),
+      intendedRole: data.intendedRole,
+      flatId: data.flatId || '',
+      tokenHash: '',
+      status: 'pending',
+      expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      createdBy: data.createdBy,
+      createdAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'societyInvites', code), sanitizeFirestoreData(invite));
+    await recordAuditLog(societyId, {
+      actorId: data.createdBy,
+      actorName: data.createdBy,
+      actorRole: 'society_admin',
+      action: 'INVITE_MEMBER',
+      targetType: 'SocietyInvite',
+      targetId: code,
+      reason: `Invited ${invite.email} as ${data.intendedRole}`,
+    });
+    return invite;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function getInviteByCode(code: string): Promise<SocietyInvite | null> {
+  const path = `societyInvites/${code.trim().toUpperCase()}`;
+  try {
+    const snap = await getDoc(doc(db, 'societyInvites', code.trim().toUpperCase()));
+    if (!snap.exists()) return null;
+    return snap.data() as SocietyInvite;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    throw error;
+  }
+}
+
+export async function acceptSocietyInvite(
+  code: string,
+  fbUser: FirebaseUser
+): Promise<{ societyId: string }> {
+  const normalized = code.trim().toUpperCase();
+
+  // Preferred: server-validated acceptance via Cloud Function.
+  if (functions) {
+    try {
+      const fn = httpsCallable<{ code: string }, { societyId: string }>(functions, 'acceptInvite');
+      const res = await fn({ code: normalized });
+      return { societyId: res.data.societyId };
+    } catch (err: any) {
+      // Functions not deployed / unreachable → fall through to direct path.
+      // Validation errors (not-found, permission-denied, etc.) are rethrown.
+      if (err?.code !== 'functions/unimplemented' && err?.code !== 'functions/unavailable') {
+        throw err;
+      }
+    }
+  }
+
+  // INTERIM direct path (enforced client-side; migrate fully to function).
+  const invite = await getInviteByCode(normalized);
+  if (!invite) {
+    throw new Error('Invitation code not found. Please check the code and try again.');
+  }
+  if (invite.status !== 'pending') {
+    throw new Error(`This invitation is ${invite.status} and can no longer be used.`);
+  }
+  if (new Date(invite.expiresAt).getTime() < Date.now()) {
+    await updateDoc(doc(db, 'societyInvites', normalized), { status: 'expired' });
+    throw new Error('This invitation has expired. Please ask for a new one.');
+  }
+  const userEmail = (fbUser.email || '').trim().toLowerCase();
+  if (!userEmail || userEmail !== invite.email) {
+    throw new Error('This invitation was sent to a different email address. Please sign in with the invited email.');
+  }
+
+  // Atomic: create active membership + mark invite accepted + link society
+  const batch = writeBatch(db);
+  const now = new Date().toISOString();
+  const memberRef = doc(db, 'societies', invite.societyId, 'members', fbUser.uid);
+  batch.set(
+    memberRef,
+    sanitizeFirestoreData({
+      id: fbUser.uid,
+      uid: fbUser.uid,
+      societyId: invite.societyId,
+      name: fbUser.displayName || userEmail.split('@')[0],
+      email: userEmail,
+      phone: fbUser.phoneNumber || '',
+      role: invite.intendedRole,
+      status: 'active',
+      flatId: invite.flatId || '',
+      flatNumber: '',
+      towerName: '',
+      type: 'Owner',
+      profileComplete: false,
+      invitedBy: invite.createdBy,
+      joinedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    }),
+    { merge: true }
+  );
+  batch.update(doc(db, 'societyInvites', normalized), {
+    status: 'accepted',
+    acceptedBy: fbUser.uid,
+    acceptedAt: now,
+  });
+  await batch.commit();
+
+  await linkSocietyToPlatformUser(fbUser.uid, invite.societyId);
+
+  // First society_admin acceptance moves the society into onboarding.
+  if (invite.intendedRole === 'society_admin') {
+    try {
+      const socRef = doc(db, 'societies', invite.societyId);
+      const socSnap = await getDoc(socRef);
+      if (socSnap.exists() && (socSnap.data() as Society).status === 'pending_admin') {
+        await updateDoc(socRef, { status: 'onboarding', updatedAt: now });
+      }
+    } catch {
+      // Non-fatal: platform admin can advance the lifecycle manually.
+    }
+  }
+
+  await recordAuditLog(invite.societyId, {
+    actorId: fbUser.uid,
+    actorName: userEmail,
+    actorRole: invite.intendedRole,
+    action: 'ACCEPT_INVITATION',
+    targetType: 'SocietyInvite',
+    targetId: normalized,
+    reason: `Joined as ${invite.intendedRole}`,
+  });
+  return { societyId: invite.societyId };
+}
+
+export async function requestSocietyMembership(
+  societyId: string,
+  fbUser: FirebaseUser
+): Promise<void> {
+  const path = `societies/${societyId}/members/${fbUser.uid}`;
+  try {
+    const userEmail = (fbUser.email || '').trim().toLowerCase();
+    const now = new Date().toISOString();
+    await setDoc(
+      doc(db, 'societies', societyId, 'members', fbUser.uid),
+      sanitizeFirestoreData({
+        id: fbUser.uid,
+        uid: fbUser.uid,
+        societyId,
+        name: fbUser.displayName || userEmail.split('@')[0] || 'New Member',
+        email: userEmail,
+        phone: fbUser.phoneNumber || '',
+        role: 'resident',
+        status: 'pending',
+        flatId: '',
+        flatNumber: '',
+        towerName: '',
+        type: 'Owner',
+        profileComplete: false,
+        joinedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+      { merge: true }
+    );
+    await recordAuditLog(societyId, {
+      actorId: fbUser.uid,
+      actorName: userEmail,
+      actorRole: 'resident',
+      action: 'REQUEST_MEMBERSHIP',
+      targetType: 'SocietyMember',
+      targetId: fbUser.uid,
+      reason: 'Join request via society search',
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function revokeSocietyInvite(code: string, actorId: string): Promise<void> {
+  const path = `societyInvites/${code}`;
+  try {
+    await updateDoc(doc(db, 'societyInvites', code), { status: 'revoked' });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
   }
 }
 
@@ -606,6 +837,21 @@ export async function processServerConfirmedPayment(
   billId: string,
   paymentDetails: { method: string; transactionId: string; amount: number }
 ): Promise<void> {
+  // Preferred: server-confirmed payment via Cloud Function.
+  if (functions) {
+    try {
+      const fn = httpsCallable(functions, 'confirmPayment');
+      await fn({ societyId, billId, ...paymentDetails });
+      return;
+    } catch (err: any) {
+      if (err?.code !== 'functions/unimplemented' && err?.code !== 'functions/unavailable') {
+        throw err;
+      }
+    }
+  }
+
+  // INTERIM direct path: residents are rejected by security rules
+  // (bills are admin-write-only); admins recording offline payments succeed.
   const path = `societies/${societyId}/bills/${billId}`;
   try {
     const billRef = doc(db, 'societies', societyId, 'bills', billId);
@@ -635,6 +881,7 @@ export async function processServerConfirmedPayment(
     }));
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
   }
 }
 
@@ -653,6 +900,23 @@ export function subscribeFacilities(societyId: string, callback: (facilities: Fa
     },
     (error) => handleFirestoreError(error, OperationType.LIST, path)
   );
+}
+
+export async function createFacilityRecord(
+  societyId: string,
+  facility: Omit<Facility, 'id' | 'societyId'>
+): Promise<Facility> {
+  const id = `fac-${facility.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+  const path = `societies/${societyId}/facilities/${id}`;
+  try {
+    const record: Facility = { ...facility, id, societyId } as Facility;
+    const clean = sanitizeFirestoreData(record);
+    await setDoc(doc(db, 'societies', societyId, 'facilities', id), clean);
+    return clean;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
 }
 
 export function subscribeFacilityBookings(societyId: string, callback: (bookings: FacilityBooking[]) => void) {
@@ -816,6 +1080,25 @@ export function subscribeVotes(societyId: string, electionId: string, callback: 
 }
 
 export async function castVoteRecord(societyId: string, electionId: string, vote: Omit<Vote, 'id' | 'castAt'>): Promise<Vote> {
+  // Preferred: transactional server-side vote with duplicate protection.
+  if (functions) {
+    try {
+      const fn = httpsCallable(functions, 'castVote');
+      const res: any = await fn({
+        societyId,
+        electionId,
+        position: vote.position,
+        candidateId: vote.candidateId,
+      });
+      return { ...vote, id: res.data.voteId, societyId, electionId, castAt: new Date().toISOString() } as Vote;
+    } catch (err: any) {
+      if (err?.code !== 'functions/unimplemented' && err?.code !== 'functions/unavailable') {
+        throw err;
+      }
+    }
+  }
+
+  // INTERIM direct path (duplicate protection is client-best-effort).
   const id = `vote-${vote.voterId}-${vote.position.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
   const path = `societies/${societyId}/elections/${electionId}/votes/${id}`;
   try {
@@ -938,175 +1221,5 @@ export async function createSupportSessionRecord(
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
     throw error;
-  }
-}
-
-// -------------------------------------------------------------
-// 13. REAL PRODUCTION TENANT INITIALIZER (Zero-Mock Bootstrap)
-// -------------------------------------------------------------
-
-/**
- * Initializes the default production tenant "greenwood-heights" directly into Cloud Firestore
- * if the database is currently empty. This eliminates reliance on in-memory mock datasets.
- */
-export async function bootstrapProductionTenantIfEmpty(): Promise<void> {
-  const societyId = 'greenwood-heights';
-  try {
-    const societyDoc = await getDoc(doc(db, 'societies', societyId));
-    if (societyDoc.exists()) {
-      return;
-    }
-
-    console.log('[NestWell Multi-Tenant] Initializing Greenwood Heights in Cloud Firestore...');
-    const batch = writeBatch(db);
-
-    // 1. Society Record
-    const society: Society = {
-      id: societyId,
-      name: 'Greenwood Heights RWA',
-      legalName: 'Greenwood Heights Apartment Owners Association',
-      city: 'Bengaluru, KA',
-      address: 'Near Sarjapur Road, Bellandur, Bengaluru, Karnataka 560103',
-      status: 'active',
-      timezone: 'Asia/Kolkata',
-      currency: 'INR',
-      registeredNumber: 'RWA-BLR-2019-742',
-      features: {
-        facilityBooking: true,
-        visitorManagement: true,
-        maintenanceBilling: true,
-        complaints: true,
-        elections: true,
-        notices: true,
-      },
-      totalFlats: 144,
-      totalResidents: 480,
-      createdAt: new Date().toISOString(),
-      createdBy: 'system-bootstrap',
-      activatedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    batch.set(doc(db, 'societies', societyId), sanitizeFirestoreData(society));
-
-    // 2. Towers
-    const towers: Tower[] = [
-      { id: 'tower-a', societyId, name: 'Tower A', code: 'A', floors: 12, totalFlats: 48, status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: 'tower-b', societyId, name: 'Tower B', code: 'B', floors: 12, totalFlats: 48, status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: 'tower-c', societyId, name: 'Tower C', code: 'C', floors: 12, totalFlats: 48, status: 'active', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ];
-    for (const t of towers) {
-      batch.set(doc(db, 'societies', societyId, 'towers', t.id), sanitizeFirestoreData(t));
-    }
-
-    // 3. First-Class Flats
-    const sampleFlats: Flat[] = [
-      { id: 'flat-a-101', societyId, number: 'A-101', towerId: 'tower-a', towerName: 'Tower A', floor: 1, type: '2BHK', status: 'active', ownerIds: [], ownerNames: ['Vikram Sharma'], tenantIds: [], primaryResidentName: 'Vikram Sharma', primaryResidentPhone: '+91 98450 12345', dues: 0, vehicles: [{ number: 'KA 03 MX 1100', type: 'Car', slot: 'A-P01' }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: 'flat-b-402', societyId, number: 'B-402', towerId: 'tower-b', towerName: 'Tower B', floor: 4, type: '3BHK', status: 'active', ownerIds: [], ownerNames: ['Sayan Ghosh'], tenantIds: [], primaryResidentName: 'Sayan Ghosh', primaryResidentPhone: '+91 98765 43210', dues: 4600, vehicles: [{ number: 'KA 03 MX 8412', type: 'Car', slot: 'B-P12' }, { number: 'KA 03 EV 2109', type: 'Two-Wheeler', slot: 'B-T04' }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: 'flat-b-403', societyId, number: 'B-403', towerId: 'tower-b', towerName: 'Tower B', floor: 4, type: '3BHK', status: 'active', ownerIds: [], ownerNames: ['Ananya Rao'], tenantIds: [], primaryResidentName: 'Ananya Rao', primaryResidentPhone: '+91 98112 33445', dues: 0, vehicles: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: 'flat-c-201', societyId, number: 'C-201', towerId: 'tower-c', towerName: 'Tower C', floor: 2, type: '2BHK', status: 'active', ownerIds: [], ownerNames: ['Rajesh Iyer'], tenantIds: [], primaryResidentName: 'Rajesh Iyer', primaryResidentPhone: '+91 99000 88776', dues: 0, vehicles: [{ number: 'KA 05 Z 9911', type: 'Car', slot: 'C-P05' }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ];
-    for (const f of sampleFlats) {
-      batch.set(doc(db, 'societies', societyId, 'flats', f.id), sanitizeFirestoreData(f));
-    }
-
-    // 4. Facilities
-    const facilities: Facility[] = [
-      { id: 'fac-clubhouse', societyId, name: 'Club House & Banquet', description: 'Central air-conditioned multi-purpose hall with audio system', capacity: 120, pricePerHour: 1500, timings: '08:00 AM - 10:00 PM', icon: 'Building2', availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], slots: [] },
-      { id: 'fac-badminton', societyId, name: 'Indoor Badminton Court', description: 'Wooden synthetic court with professional LED lighting', capacity: 6, pricePerHour: 200, timings: '06:00 AM - 10:00 PM', icon: 'Activity', availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], slots: [] },
-      { id: 'fac-pool', societyId, name: 'Olympic Swimming Pool', description: 'Temperature-regulated adult pool with separate kids splash zone', capacity: 40, pricePerHour: 0, timings: '06:00 AM - 08:00 PM', icon: 'Waves', availableDays: ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], slots: [] },
-    ];
-    for (const fac of facilities) {
-      batch.set(doc(db, 'societies', societyId, 'facilities', fac.id), sanitizeFirestoreData(fac));
-    }
-
-    // 5. Initial Notices
-    const notices: Notice[] = [
-      { id: 'not-agm', societyId, title: 'Annual General Meeting (AGM) Notification', category: 'event', message: 'The 7th Annual General Meeting of Greenwood Heights RWA is scheduled for Sunday at 10:30 AM in the Clubhouse. All flat owners and residents are requested to attend.', audience: 'Entire Society', priority: 'urgent', publishedBy: 'Managing Committee RWA', date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }), createdAt: new Date().toISOString() },
-      { id: 'not-filter', societyId, title: 'Quarterly Water Filter Cleaning Scheduled', category: 'maintenance', message: 'Main overhead water tanks for Tower A & Tower B will be cleaned tomorrow between 10:00 AM and 02:00 PM. Please store adequate water.', audience: 'Entire Society', priority: 'normal', publishedBy: 'Maintenance Supervisor', date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }), createdAt: new Date().toISOString() },
-    ];
-    for (const n of notices) {
-      batch.set(doc(db, 'societies', societyId, 'notices', n.id), sanitizeFirestoreData(n));
-    }
-
-    // 6. Initial Active Election
-    const election: Election = {
-      id: 'elec-2026-28',
-      societyId,
-      title: 'Greenwood Heights RWA Executive Committee Election 2026-2028',
-      term: '2026-2028',
-      description: 'Biennial democratic digital ballot to elect the executive officers of the association.',
-      positions: ['President', 'General Secretary', 'Treasurer', 'Maintenance & Facilities Head'],
-      nominationStart: '01 Mar 2026',
-      nominationEnd: '15 Mar 2026',
-      votingStart: '16 Mar 2026',
-      votingEnd: '25 Mar 2026',
-      status: 'Voting Active',
-      eligibleVotersCount: 144,
-      totalVotesCast: 32,
-      createdAt: new Date().toISOString(),
-    };
-    batch.set(doc(db, 'societies', societyId, 'elections', election.id), sanitizeFirestoreData(election));
-
-    // 7. Initial Nomination
-    const nomination: Nomination = {
-      id: 'nom-vikram-pres',
-      societyId,
-      electionId: election.id,
-      position: 'President',
-      candidateId: 'cand-vikram',
-      candidateName: 'Vikram Sharma',
-      flat: 'A-101',
-      tower: 'Tower A',
-      phone: '+91 98450 12345',
-      email: 'vikram.sharma@example.com',
-      profession: 'Senior Architect',
-      yearsInSociety: 5,
-      manifesto: 'Complete solar power installation for common areas to cut electricity bills by 35%, and high-speed Wi-Fi in the clubhouse.',
-      status: 'Approved',
-      voteCount: 18,
-      nominatedAt: new Date().toISOString(),
-    };
-    batch.set(doc(db, 'societies', societyId, 'elections', election.id, 'nominations', nomination.id), sanitizeFirestoreData(nomination));
-
-    // 8. Initial Maintenance Bill for Flat B-402
-    const bill: MaintenanceBill = {
-      id: 'bill-b402-current',
-      societyId,
-      billNumber: 'INV-2026-8419',
-      flat: 'B-402',
-      tower: 'Tower B',
-      residentName: 'Sayan Ghosh',
-      month: 'September',
-      year: 2026,
-      maintenanceFee: 3800,
-      parkingFee: 500,
-      lateFee: 300,
-      totalAmount: 4600,
-      status: 'Pending',
-      dueDate: '15 Sep 2026',
-      createdAt: new Date().toISOString(),
-    };
-    batch.set(doc(db, 'societies', societyId, 'bills', bill.id), sanitizeFirestoreData(bill));
-
-    // 9. Initial Analytics Rollup
-    const analytics: PlatformAnalytics = {
-      societyId,
-      societyName: 'Greenwood Heights RWA',
-      city: 'Bengaluru, KA',
-      status: 'active',
-      totalResidents: 480,
-      activeComplaints: 3,
-      outstandingAmount: 18400,
-      paymentsCollected: 342000,
-      visitorCountLast30Days: 418,
-      facilityBookingsThisMonth: 28,
-      lastUpdatedAt: new Date().toISOString(),
-    };
-    batch.set(doc(db, 'platformAnalytics', societyId), sanitizeFirestoreData(analytics));
-
-    await batch.commit();
-    console.log('[NestWell Multi-Tenant] Greenwood Heights successfully provisioned into Firestore.');
-  } catch (error) {
-    console.warn('[NestWell Multi-Tenant] Tenant bootstrap skipped or encountered issue:', error);
   }
 }

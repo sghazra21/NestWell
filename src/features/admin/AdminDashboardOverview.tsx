@@ -10,7 +10,6 @@ import {
   Clock,
   AlertCircle,
   CheckCircle2,
-  BellRing,
   Plus,
   Send,
 } from 'lucide-react';
@@ -24,7 +23,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
   onNavigate,
   onOpenComplaintDrawer,
 }) => {
-  const { complaints, visitors, bills, residents, triggerGateSimulation } = useApp();
+  const { complaints, visitors, bills, residents, currentSociety } = useApp();
 
   const totalDuesPending = bills
     .filter((b) => b.status !== 'Paid')
@@ -43,19 +42,11 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
             Good morning, Admin 👋
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Here is what is happening at Greenwood Heights today.
+            Here is what is happening at {currentSociety?.name || 'your society'} today.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={triggerGateSimulation}
-            className="h-10 px-4 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 text-xs font-semibold flex items-center gap-2 transition-colors"
-          >
-            <BellRing className="w-3.5 h-3.5 text-orange-600 animate-bounce" />
-            <span>Simulate Visitor Arrival</span>
-          </button>
-
           <button
             onClick={() => onNavigate('notices')}
             className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"

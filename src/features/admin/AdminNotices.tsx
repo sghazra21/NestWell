@@ -5,7 +5,7 @@ import { Modal } from '../../components/common/Modal';
 import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles } from 'lucide-react';
 
 export const AdminNotices: React.FC = () => {
-  const { notices, publishNotice } = useApp();
+  const { notices, publishNotice, userProfile, currentSociety } = useApp();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -26,7 +26,7 @@ export const AdminNotices: React.FC = () => {
       priority,
       audience,
       targetBlock: audience.includes('Tower') ? audience.replace(' Only', '') : undefined,
-      publishedBy: 'Greenwood Heights RWA Committee',
+      publishedBy: userProfile?.name || currentSociety?.name || 'Society Administration',
       date: 'Today',
       time,
       attachmentName: 'Official_Notice.pdf',
@@ -109,7 +109,7 @@ export const AdminNotices: React.FC = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Publish Society Notice"
-        subtitle="Broadcast to Greenwood Heights community"
+        subtitle={`Broadcast to ${currentSociety?.name || 'society'} community`}
         maxWidth="md"
       >
         <form onSubmit={handlePublish} className="space-y-4">
