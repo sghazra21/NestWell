@@ -14,6 +14,8 @@ import {
   LogOut,
   Sparkles,
   Lock,
+  Building2,
+  Layers,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -23,6 +25,13 @@ export const RoleSwitcher: React.FC = () => {
     setRole,
     user,
     userProfile,
+    isPlatformAdmin,
+    activeView,
+    setActiveView,
+    societies,
+    currentSocietyId,
+    setCurrentSocietyId,
+    currentSociety,
     setIsAuthModalOpen,
     setIsProfileCompletionOpen,
     setIsElectionModalOpen,
@@ -62,15 +71,31 @@ export const RoleSwitcher: React.FC = () => {
       className="sticky top-0 z-50 bg-[#091426] text-white border-b border-slate-800 shadow-md text-xs select-none"
     >
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2.5">
-        {/* Role Pill Switcher */}
-        <div className="flex items-center gap-2">
+        {/* Role Pill Switcher & Society Tenant Context */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Active Society Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-700/60 text-slate-200">
+            <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <select
+              value={currentSocietyId}
+              onChange={(e) => setCurrentSocietyId(e.target.value)}
+              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-1"
+            >
+              {societies.map((s) => (
+                <option key={s.id} value={s.id} className="bg-slate-900 text-white">
+                  {s.name} ({s.city})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <span className="font-bold text-indigo-400 uppercase tracking-wider text-[11px] hidden sm:inline">
             Active Role:
           </span>
           <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 shadow-inner">
             {roles.map((r) => {
-              const active = role === r.id;
-              const isAllowedAdmin = userProfile?.role === 'admin' || userProfile?.id === 'admin-local-master';
+              const active = activeView === 'app' && role === r.id;
+              const isAllowedAdmin = userProfile?.role === 'admin' || userProfile?.id === 'admin-local-master' || isPlatformAdmin;
               const isLocked = r.id === 'admin' && !isAllowedAdmin;
 
               return (
@@ -78,6 +103,7 @@ export const RoleSwitcher: React.FC = () => {
                   key={r.id}
                   id={`role-btn-${r.id}`}
                   onClick={() => {
+                    setActiveView('app');
                     if (isLocked) {
                       showToast('Administrative privileges required. Please contact a Society Admin.');
                       return;
@@ -100,6 +126,23 @@ export const RoleSwitcher: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Platform Super Admin Console button */}
+          {isPlatformAdmin && (
+            <button
+              id="platform-console-btn"
+              onClick={() => setActiveView(activeView === 'platform_admin' ? 'app' : 'platform_admin')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all border ${
+                activeView === 'platform_admin'
+                  ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
+                  : 'bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border-indigo-700/60'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Platform Console</span>
+              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+            </button>
+          )}
         </div>
 
         {/* Global Features & Controls */}

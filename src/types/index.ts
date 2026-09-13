@@ -1,4 +1,9 @@
-export type UserRole = 'resident' | 'security' | 'admin' | 'committee';
+export * from './society';
+export * from './flat';
+export * from './membership';
+export * from './platform';
+
+export type UserRole = 'resident' | 'security' | 'admin' | 'committee' | 'platform_admin';
 
 export interface UserProfile {
   id: string;
@@ -7,7 +12,9 @@ export interface UserProfile {
   role: UserRole;
   phone?: string;
   flat?: string;
+  flatId?: string;
   tower?: string;
+  towerId?: string;
   type?: 'Owner' | 'Tenant';
   isProfileComplete: boolean;
   avatar?: string;
@@ -16,6 +23,8 @@ export interface UserProfile {
   designation?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
+  societyId?: string;
+  platformRole?: 'platform_admin' | null;
   createdAt: string;
 }
 
@@ -57,6 +66,7 @@ export type VisitorType = 'Guest' | 'Delivery' | 'Service' | 'Cab';
 
 export interface Visitor {
   id: string;
+  societyId?: string;
   name: string;
   phone: string;
   flat: string;
@@ -92,6 +102,7 @@ export interface ComplaintTimelineEvent {
 
 export interface Complaint {
   id: string;
+  societyId?: string;
   ticketNumber: string;
   title: string;
   category: ComplaintCategory;
@@ -115,6 +126,7 @@ export interface Complaint {
 
 export interface MaintenanceBill {
   id: string;
+  societyId?: string;
   billNumber: string;
   flat: string;
   tower: string;
@@ -130,10 +142,12 @@ export interface MaintenanceBill {
   paidAt?: string;
   paymentMethod?: string;
   transactionId?: string;
+  createdAt?: string;
 }
 
 export interface Facility {
   id: string;
+  societyId?: string;
   name: string;
   description: string;
   capacity: number;
@@ -146,6 +160,7 @@ export interface Facility {
 
 export interface FacilityBooking {
   id: string;
+  societyId?: string;
   facilityId: string;
   facilityName: string;
   flat: string;
@@ -159,6 +174,7 @@ export interface FacilityBooking {
 
 export interface Notice {
   id: string;
+  societyId?: string;
   title: string;
   category: 'maintenance' | 'event' | 'security' | 'general';
   message: string;
@@ -175,6 +191,7 @@ export interface Notice {
 
 export interface ActivityEvent {
   id: string;
+  societyId?: string;
   time: string;
   title: string;
   flat: string;
@@ -195,6 +212,7 @@ export type ElectionPosition =
 
 export interface Nomination {
   id: string;
+  societyId?: string;
   electionId: string;
   position: ElectionPosition;
   candidateId: string;
@@ -214,6 +232,7 @@ export interface Nomination {
 
 export interface Vote {
   id: string;
+  societyId?: string;
   electionId: string;
   position: ElectionPosition;
   candidateId: string;
@@ -224,6 +243,7 @@ export interface Vote {
 
 export interface Election {
   id: string;
+  societyId?: string;
   title: string;
   term: string; // e.g. "2026-2028"
   description: string;

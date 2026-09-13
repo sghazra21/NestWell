@@ -9,12 +9,14 @@ import { ProfileCompletionModal } from './components/auth/ProfileCompletionModal
 import { SocietyElectionModal } from './features/election/SocietyElectionModal';
 import { IndianPaymentsResearchModal } from './components/payment/IndianPaymentsResearchModal';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { PlatformAdminDashboard } from './features/platform/PlatformAdminDashboard';
 import { Wifi, Battery, Signal, CheckCircle, Info } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
     role,
     userProfile,
+    activeView,
     previewMode,
     isAuthModalOpen,
     setIsAuthModalOpen,
@@ -52,7 +54,9 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
       <RoleSwitcher />
 
-      {role === 'admin' ? (
+      {activeView === 'platform_admin' ? (
+        <PlatformAdminDashboard />
+      ) : role === 'admin' ? (
         <div className="flex-1 bg-slate-100">
           <AdminLayout />
         </div>

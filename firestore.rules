@@ -2,77 +2,183 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
+    // Global helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Users Collection
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isOwner(userId) || isAuthenticated();
+    // Check if user has global platform admin privileges
+    function isPlatformAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'sghazra21@gmail.com' ||
+        (exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.platformRole == 'platform_admin')
+      );
     }
 
-    // Visitors Collection
-    match /visitors/{visitorId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+    // Check if user is an active member of the specified society
+    function isSocietyMember(societyId) {
+      return isSignedIn() && (
+        isPlatformAdmin() ||
+        (exists(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)).data.status == 'active')
+      );
     }
 
-    // Complaints Collection
-    match /complaints/{complaintId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+    // Get society member role
+    function getSocietyRole(societyId) {
+      return get(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)).data.role;
     }
 
-    // Bills Collection
-    match /bills/{billId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+    // Check if user is Society Admin in this tenant
+    function isSocietyAdmin(societyId) {
+      return isPlatformAdmin() || (
+        isSocietyMember(societyId) && (
+          getSocietyRole(societyId) == 'society_admin' ||
+          getSocietyRole(societyId) == 'admin'
+        )
+      );
     }
 
-    // Facilities Collection
-    match /facilities/{facilityId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+    // Check if user is Security personnel in this tenant
+    function isSecurityGuard(societyId) {
+      return isSocietyAdmin(societyId) || (
+        isSocietyMember(societyId) && getSocietyRole(societyId) == 'security'
+      );
     }
 
-    // Facility Bookings Collection
-    match /facility_bookings/{bookingId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+    // Global Platform Users Index
+    match /platformUsers/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(userId) || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
     }
 
-    // Notices Collection
-    match /notices/{noticeId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+    // Society Invites
+    match /societyInvites/{inviteId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isPlatformAdmin();
     }
 
-    // Society Committee Elections
-    match /elections/{electionId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+    // Platform Analytics (Derived rollups)
+    match /platformAnalytics/{societyId} {
+      allow read: if isSignedIn();
+      allow write: if isPlatformAdmin() || isSignedIn();
+    }
 
-      match /nominations/{nominationId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isAuthenticated();
-        allow delete: if isAuthenticated();
+    // Support Sessions
+    match /supportSessions/{sessionId} {
+      allow read, write: if isPlatformAdmin();
+    }
+
+    // Societies (Tenant Root)
+    match /societies/{societyId} {
+      allow read: if isSignedIn();
+      allow create: if isPlatformAdmin() || isSignedIn();
+      allow update, delete: if isPlatformAdmin() || isSocietyAdmin(societyId);
+
+      // Towers subcollection
+      match /towers/{towerId} {
+        allow read: if isSocietyMember(societyId);
+        allow write: if isSocietyAdmin(societyId);
       }
 
-      match /votes/{voteId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated();
+      // Flats subcollection (First-class units)
+      match /flats/{flatId} {
+        allow read: if isSocietyMember(societyId);
+        allow write: if isSocietyAdmin(societyId);
       }
+
+      // Members subcollection (Authoritative society role)
+      match /members/{memberId} {
+        allow read: if isSocietyMember(societyId);
+        allow create: if isSignedIn();
+        allow update: if isSocietyAdmin(societyId) || isOwner(memberId);
+        allow delete: if isSocietyAdmin(societyId);
+      }
+
+      // Visitors & Gate Security
+      match /visitors/{visitorId} {
+        allow read: if isSocietyMember(societyId);
+        allow create: if isSocietyMember(societyId);
+        allow update: if isSocietyMember(societyId) || isSecurityGuard(societyId) || isSocietyAdmin(societyId);
+        allow delete: if isSocietyAdmin(societyId);
+      }
+
+      // Complaints & Maintenance Tickets
+      match /complaints/{complaintId} {
+        allow read: if isSocietyMember(societyId);
+        allow create: if isSocietyMember(societyId);
+        allow update: if isSocietyMember(societyId);
+        allow delete: if isSocietyAdmin(societyId);
+      }
+
+      // Billing & Dues
+      match /bills/{billId} {
+        allow read: if isSocietyMember(societyId);
+        allow write: if isSocietyAdmin(societyId);
+      }
+
+      // Server-confirmed Payments
+      match /payments/{paymentId} {
+        allow read: if isSocietyMember(societyId);
+        allow create, update: if isSocietyMember(societyId);
+        allow delete: if isSocietyAdmin(societyId);
+      }
+
+      // Facilities & Amenities
+      match /facilities/{facilityId} {
+        allow read: if isSocietyMember(societyId);
+        allow write: if isSocietyAdmin(societyId);
+      }
+
+      // Facility Bookings
+      match /facilityBookings/{bookingId} {
+        allow read: if isSocietyMember(societyId);
+        allow create, update: if isSocietyMember(societyId);
+        allow delete: if isSocietyAdmin(societyId);
+      }
+
+      // Notices & Circulars
+      match /notices/{noticeId} {
+        allow read: if isSocietyMember(societyId);
+        allow write: if isSocietyAdmin(societyId);
+      }
+
+      // Elections & Ballots
+      match /elections/{electionId} {
+        allow read: if isSocietyMember(societyId);
+        allow write: if isSocietyAdmin(societyId);
+
+        match /nominations/{nominationId} {
+          allow read: if isSocietyMember(societyId);
+          allow create: if isSocietyMember(societyId);
+          allow update, delete: if isSocietyAdmin(societyId) || isOwner(request.resource.data.candidateId);
+        }
+
+        match /votes/{voteId} {
+          allow read: if isSocietyMember(societyId);
+          allow create: if isSocietyMember(societyId);
+          allow update: if isSocietyAdmin(societyId);
+        }
+      }
+
+      // Immutable Audit Logs
+      match /auditLogs/{logId} {
+        allow read: if isSocietyAdmin(societyId);
+        allow create: if isSignedIn();
+        allow update, delete: if false; // Audit logs are strictly immutable
+      }
+    }
+
+    // Default deny for unmapped root paths
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

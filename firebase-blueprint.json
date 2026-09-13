@@ -1,23 +1,122 @@
 {
   "entities": {
-    "User": {
-      "title": "User",
-      "description": "User profile with authentication and role assignments",
+    "PlatformUser": {
+      "title": "PlatformUser",
+      "description": "Global user identity document and society associations",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string" },
         "name": { "type": "string" },
-        "role": { "type": "string", "enum": ["resident", "admin", "security", "committee"] },
+        "platformRole": { "type": "string", "enum": ["platform_admin", null] },
+        "societyIds": { "type": "array" },
+        "currentSocietyId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "email", "name"]
+    },
+    "Society": {
+      "title": "Society",
+      "description": "Tenant organization representing a gated society or residential complex",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "legalName": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "pending_admin", "onboarding", "active", "suspended", "archived"] },
+        "timezone": { "type": "string" },
+        "currency": { "type": "string" },
+        "features": { "type": "object" },
+        "registeredNumber": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "activatedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "city", "status"]
+    },
+    "Tower": {
+      "title": "Tower",
+      "description": "Building or block within a society",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "societyId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "floors": { "type": "integer" },
+        "totalFlats": { "type": "integer" },
+        "status": { "type": "string", "enum": ["active", "maintenance"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "code"]
+    },
+    "Flat": {
+      "title": "Flat",
+      "description": "First-class residential unit or apartment within a society",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "societyId": { "type": "string" },
+        "number": { "type": "string" },
+        "towerId": { "type": "string" },
+        "floor": { "type": "integer" },
+        "type": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "vacant", "blocked"] },
+        "ownerIds": { "type": "array" },
+        "tenantIds": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "number", "towerId", "status"]
+    },
+    "SocietyMember": {
+      "title": "SocietyMember",
+      "description": "Authoritative membership linking a user account to a society with their verified role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "societyId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
         "phone": { "type": "string" },
-        "flat": { "type": "string" },
-        "tower": { "type": "string" },
-        "type": { "type": "string", "enum": ["Owner", "Tenant"] },
-        "isProfileComplete": { "type": "boolean" },
-        "avatar": { "type": "string" },
+        "role": { "type": "string", "enum": ["society_admin", "committee", "security", "resident"] },
+        "status": { "type": "string", "enum": ["pending", "active", "suspended", "removed"] },
+        "flatId": { "type": "string" },
+        "flatNumber": { "type": "string" },
+        "towerName": { "type": "string" },
+        "designation": { "type": "string" },
+        "profileComplete": { "type": "boolean" },
+        "joinedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "uid", "name", "email", "role", "status"]
+    },
+    "SocietyInvite": {
+      "title": "SocietyInvite",
+      "description": "Invitation to join a society with a pre-assigned role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "societyId": { "type": "string" },
+        "email": { "type": "string" },
+        "intendedRole": { "type": "string", "enum": ["society_admin", "committee", "security", "resident"] },
+        "flatId": { "type": "string" },
+        "tokenHash": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "revoked", "expired"] },
+        "expiresAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "acceptedBy": { "type": "string" },
+        "acceptedAt": { "type": "string" },
         "createdAt": { "type": "string" }
       },
-      "required": ["id", "email", "name", "role", "isProfileComplete"]
+      "required": ["id", "societyId", "email", "intendedRole", "status"]
     },
     "Visitor": {
       "title": "Visitor",
@@ -25,6 +124,9 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
+        "residentId": { "type": "string" },
+        "flatId": { "type": "string" },
         "name": { "type": "string" },
         "phone": { "type": "string" },
         "flat": { "type": "string" },
@@ -32,17 +134,18 @@
         "residentName": { "type": "string" },
         "purpose": { "type": "string" },
         "type": { "type": "string", "enum": ["Guest", "Delivery", "Service", "Cab"] },
-        "company": { "type": "string" },
-        "expectedDate": { "type": "string" },
-        "expectedTime": { "type": "string" },
         "passNumber": { "type": "string" },
         "qrCode": { "type": "string" },
         "status": { "type": "string", "enum": ["expected", "waiting", "inside", "exited", "rejected"] },
+        "approvalStatus": { "type": "string" },
+        "expectedDate": { "type": "string" },
+        "expectedTime": { "type": "string" },
         "entryTime": { "type": "string" },
         "exitTime": { "type": "string" },
         "vehicleNumber": { "type": "string" },
         "gateNumber": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
       "required": ["id", "name", "flat", "passNumber", "status"]
     },
@@ -52,9 +155,10 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "ticketNumber": { "type": "string" },
         "title": { "type": "string" },
-        "category": { "type": "string", "enum": ["Plumbing", "Electrical", "Lift", "Cleaning", "Water", "Security", "Other"] },
+        "category": { "type": "string" },
         "description": { "type": "string" },
         "flat": { "type": "string" },
         "tower": { "type": "string" },
@@ -62,10 +166,11 @@
         "residentPhone": { "type": "string" },
         "status": { "type": "string", "enum": ["reported", "assigned", "started", "resolved"] },
         "priority": { "type": "string", "enum": ["Normal", "High", "Urgent"] },
-        "photoUrl": { "type": "string" },
-        "reportedAt": { "type": "string" }
+        "reportedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
-      "required": ["id", "ticketNumber", "title", "category", "flat", "status", "priority"]
+      "required": ["id", "ticketNumber", "title", "category", "status", "priority"]
     },
     "MaintenanceBill": {
       "title": "MaintenanceBill",
@@ -73,23 +178,43 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "billNumber": { "type": "string" },
         "flat": { "type": "string" },
         "tower": { "type": "string" },
         "residentName": { "type": "string" },
         "month": { "type": "string" },
         "year": { "type": "integer" },
-        "maintenanceFee": { "type": "number" },
-        "parkingFee": { "type": "number" },
-        "lateFee": { "type": "number" },
         "totalAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["Paid", "Pending", "Overdue"] },
         "dueDate": { "type": "string" },
         "paidAt": { "type": "string" },
         "paymentMethod": { "type": "string" },
-        "transactionId": { "type": "string" }
+        "transactionId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
       "required": ["id", "billNumber", "flat", "totalAmount", "status", "dueDate"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Server-confirmed payment transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "societyId": { "type": "string" },
+        "billId": { "type": "string" },
+        "flatId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "provider": { "type": "string" },
+        "providerTransactionId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "failed", "refunded"] },
+        "initiatedAt": { "type": "string" },
+        "confirmedAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "billId", "amount", "status"]
     },
     "Facility": {
       "title": "Facility",
@@ -97,6 +222,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
         "capacity": { "type": "integer" },
@@ -112,6 +238,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "facilityId": { "type": "string" },
         "facilityName": { "type": "string" },
         "flat": { "type": "string" },
@@ -130,12 +257,11 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "title": { "type": "string" },
-        "category": { "type": "string", "enum": ["maintenance", "event", "security", "general"] },
+        "category": { "type": "string" },
         "message": { "type": "string" },
-        "audience": { "type": "string", "enum": ["Entire Society", "Building", "Selected Flats"] },
-        "targetBlock": { "type": "string" },
-        "date": { "type": "string" },
+        "audience": { "type": "string" },
         "priority": { "type": "string", "enum": ["normal", "urgent"] },
         "publishedBy": { "type": "string" },
         "createdAt": { "type": "string" }
@@ -148,15 +274,11 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "title": { "type": "string" },
         "term": { "type": "string" },
         "description": { "type": "string" },
-        "nominationStart": { "type": "string" },
-        "nominationEnd": { "type": "string" },
-        "votingStart": { "type": "string" },
-        "votingEnd": { "type": "string" },
         "status": { "type": "string", "enum": ["Draft", "Nomination Open", "Voting Active", "Completed"] },
-        "eligibleVotersCount": { "type": "integer" },
         "totalVotesCast": { "type": "integer" },
         "createdAt": { "type": "string" }
       },
@@ -168,20 +290,14 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "electionId": { "type": "string" },
-        "position": { "type": "string", "enum": ["President", "Secretary", "Treasurer", "Cultural Secretary", "Maintenance Head", "Security Committee Head"] },
-        "candidateId": { "type": "string" },
+        "position": { "type": "string" },
         "candidateName": { "type": "string" },
         "flat": { "type": "string" },
-        "tower": { "type": "string" },
-        "profession": { "type": "string" },
-        "yearsInSociety": { "type": "integer" },
-        "manifesto": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending Review", "Approved", "Rejected", "Withdrawn"] },
-        "voteCount": { "type": "integer" },
-        "nominatedAt": { "type": "string" }
+        "status": { "type": "string" }
       },
-      "required": ["id", "electionId", "position", "candidateName", "flat", "status"]
+      "required": ["id", "electionId", "position", "candidateName", "status"]
     },
     "Vote": {
       "title": "Vote",
@@ -189,6 +305,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "societyId": { "type": "string" },
         "electionId": { "type": "string" },
         "position": { "type": "string" },
         "candidateId": { "type": "string" },
@@ -196,49 +313,94 @@
         "voterFlat": { "type": "string" },
         "castAt": { "type": "string" }
       },
-      "required": ["id", "electionId", "position", "candidateId", "voterId", "voterFlat"]
+      "required": ["id", "electionId", "position", "candidateId", "voterId"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and administrative action audit record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "societyId": { "type": "string" },
+        "actorId": { "type": "string" },
+        "actorName": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "action": { "type": "string" },
+        "targetType": { "type": "string" },
+        "targetId": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "actorId", "action", "timestamp"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "User profile with role details and flat occupancy"
+    "/platformUsers/{userId}": {
+      "schema": "PlatformUser",
+      "description": "Global user identity document and society indices"
     },
-    "/visitors/{visitorId}": {
+    "/societies/{societyId}": {
+      "schema": "Society",
+      "description": "Isolated society tenant document"
+    },
+    "/societyInvites/{inviteId}": {
+      "schema": "SocietyInvite",
+      "description": "Society joining invitations"
+    },
+    "/societies/{societyId}/towers/{towerId}": {
+      "schema": "Tower",
+      "description": "Towers and blocks within a society"
+    },
+    "/societies/{societyId}/flats/{flatId}": {
+      "schema": "Flat",
+      "description": "First-class residential flat records"
+    },
+    "/societies/{societyId}/members/{memberId}": {
+      "schema": "SocietyMember",
+      "description": "Authoritative society membership mapping with assigned roles"
+    },
+    "/societies/{societyId}/visitors/{visitorId}": {
       "schema": "Visitor",
-      "description": "Pre-approved and walk-in visitors logged at gates"
+      "description": "Visitor logs and gate passes"
     },
-    "/complaints/{complaintId}": {
+    "/societies/{societyId}/complaints/{complaintId}": {
       "schema": "Complaint",
-      "description": "Maintenance complaints and ticket lifecycle events"
+      "description": "Maintenance tickets and complaints"
     },
-    "/bills/{billId}": {
+    "/societies/{societyId}/bills/{billId}": {
       "schema": "MaintenanceBill",
-      "description": "Monthly society maintenance dues and digital payment receipts"
+      "description": "Maintenance dues and billing records"
     },
-    "/facilities/{facilityId}": {
+    "/societies/{societyId}/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Confirmed payments and receipts"
+    },
+    "/societies/{societyId}/facilities/{facilityId}": {
       "schema": "Facility",
-      "description": "Amenities and scheduled availability slots"
+      "description": "Common facilities and amenities"
     },
-    "/facility_bookings/{bookingId}": {
+    "/societies/{societyId}/facilityBookings/{bookingId}": {
       "schema": "FacilityBooking",
-      "description": "Reservations for amenities"
+      "description": "Amenity bookings"
     },
-    "/notices/{noticeId}": {
+    "/societies/{societyId}/notices/{noticeId}": {
       "schema": "Notice",
-      "description": "Notice board circulars and announcements"
+      "description": "Society broadcast notices"
     },
-    "/elections/{electionId}": {
+    "/societies/{societyId}/elections/{electionId}": {
       "schema": "Election",
-      "description": "RWA Society Committee elections"
+      "description": "Committee election ballots"
     },
-    "/elections/{electionId}/nominations/{nominationId}": {
+    "/societies/{societyId}/elections/{electionId}/nominations/{nominationId}": {
       "schema": "Nomination",
-      "description": "Candidate nominations filed for an election post"
+      "description": "Election nominee profiles"
     },
-    "/elections/{electionId}/votes/{voteId}": {
+    "/societies/{societyId}/elections/{electionId}/votes/{voteId}": {
       "schema": "Vote",
-      "description": "Cast ballots recorded per position for an election"
+      "description": "Cast election votes"
+    },
+    "/societies/{societyId}/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Administrative audit trail"
     }
   }
 }

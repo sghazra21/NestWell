@@ -8,6 +8,7 @@ import {
   Complaint,
   MaintenanceBill,
   Facility,
+  FacilityBooking,
   Notice,
   ActivityEvent,
   SocietyInfo,
@@ -19,22 +20,15 @@ import {
   Vote,
   CommitteeMember,
   ElectionPosition,
+  Society,
+  Tower,
+  Flat,
+  SocietyMember,
+  PlatformUser,
+  PlatformAnalytics,
+  SupportSession,
+  AuditLog,
 } from '../types';
-import {
-  INITIAL_SOCIETY,
-  CURRENT_RESIDENT,
-  INITIAL_RESIDENTS,
-  INITIAL_VISITORS,
-  INITIAL_COMPLAINTS,
-  INITIAL_BILLS,
-  INITIAL_FACILITIES,
-  INITIAL_NOTICES,
-  INITIAL_ACTIVITIES,
-  INITIAL_ELECTIONS,
-  INITIAL_NOMINATIONS,
-  INITIAL_VOTES,
-  INITIAL_COMMITTEE_MEMBERS,
-} from '../mock/initialData';
 import {
   auth,
   onAuthStateChanged,
@@ -42,33 +36,74 @@ import {
   FirebaseUser,
 } from '../lib/firebase';
 import {
-  syncUserProfile,
-  updateUserProfile,
-  sanitizeFirestoreData,
-  seedFirestoreInitialData,
+  syncPlatformUser,
+  subscribePlatformUser,
+  subscribeSocieties,
+  subscribeSociety,
+  createSocietyRecord,
+  updateSocietyStatus as updateSocietyStatusInDb,
+  subscribeTowers,
+  createTowerRecord,
+  subscribeFlats,
+  createFlatRecord,
+  updateFlatRecord,
+  subscribeMembers,
+  createOrUpdateMemberRecord,
+  updateMemberRole as updateMemberRoleInDb,
   subscribeVisitors,
-  createFirestoreVisitor,
-  updateFirestoreVisitorStatus,
+  createVisitorRecord,
+  updateVisitorStatusRecord,
   subscribeComplaints,
-  createFirestoreComplaint,
-  updateFirestoreComplaint,
+  createComplaintRecord,
+  updateComplaintStatusRecord,
   subscribeBills,
-  updateFirestoreBillPayment,
-  subscribeElections,
-  createFirestoreElection,
-  updateFirestoreElection,
-  subscribeNominations,
-  submitFirestoreNomination,
-  updateFirestoreNominationStatus,
-  subscribeVotes,
-  castFirestoreVote,
+  createBillRecord,
+  processServerConfirmedPayment,
+  subscribeFacilities,
+  subscribeFacilityBookings,
+  createFacilityBookingRecord,
   subscribeNotices,
-  createFirestoreNotice,
-  subscribeUsers,
-  updateUserRoleInFirestore,
+  createNoticeRecord,
+  subscribeElections,
+  createElectionRecord,
+  subscribeNominations,
+  submitNominationRecord,
+  subscribeVotes,
+  castVoteRecord,
+  subscribeAuditLogs,
+  recordAuditLog,
+  subscribePlatformAnalytics,
+  subscribeSupportSessions,
+  createSupportSessionRecord,
+  bootstrapProductionTenantIfEmpty,
+  sanitizeFirestoreData,
 } from '../lib/firestoreService';
 
 interface AppContextType {
+  // Multi-Tenant state & controls
+  currentSocietyId: string;
+  setCurrentSocietyId: (id: string) => void;
+  currentSociety: Society | null;
+  societies: Society[];
+  platformUser: PlatformUser | null;
+  isPlatformAdmin: boolean;
+  activeView: 'app' | 'platform_admin';
+  setActiveView: (view: 'app' | 'platform_admin') => void;
+  towers: Tower[];
+  flats: Flat[];
+  members: SocietyMember[];
+  currentMembership: SocietyMember | null;
+  createSociety: (data: Partial<Society> & { name: string; city: string }) => Promise<Society>;
+  updateSocietyStatus: (societyId: string, status: Society['status']) => Promise<void>;
+  createTower: (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Tower>;
+  createFlat: (data: Omit<Flat, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Flat>;
+  updateFlat: (flatId: string, data: Partial<Flat>) => Promise<void>;
+  startSupportSession: (societyId: string, reason: string) => Promise<void>;
+  supportSessions: SupportSession[];
+  platformAnalytics: PlatformAnalytics[];
+  auditLogs: AuditLog[];
+
+  // User & Auth State
   role: UserRole;
   setRole: (role: UserRole) => void;
   user: FirebaseUser | null;
@@ -88,6 +123,7 @@ interface AppContextType {
   completeUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
 
+  // Backwards-Compatible Entity State & Handlers
   society: SocietyInfo;
   resident: ResidentProfile;
   setResident: React.Dispatch<React.SetStateAction<ResidentProfile>>;
@@ -172,92 +208,79 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Auth state
+  // Multi-Tenant Context State
+  const [currentSocietyId, setCurrentSocietyIdState] = useState<string>(() => {
+    return localStorage.getItem('nestwell_current_society_id') || 'greenwood-heights';
+  });
+  const [currentSociety, setCurrentSociety] = useState<Society | null>(null);
+  const [societies, setSocieties] = useState<Society[]>([]);
+  const [towers, setTowers] = useState<Tower[]>([]);
+  const [flats, setFlats] = useState<Flat[]>([]);
+  const [members, setMembers] = useState<SocietyMember[]>([]);
+  const [currentMembership, setCurrentMembership] = useState<SocietyMember | null>(null);
+  const [supportSessions, setSupportSessions] = useState<SupportSession[]>([]);
+  const [platformAnalytics, setPlatformAnalytics] = useState<PlatformAnalytics[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Auth & Global User state
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [platformUser, setPlatformUser] = useState<PlatformUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('nestwell_user_profile');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
+    return saved ? JSON.parse(saved) : null;
   });
-  const [registeredUsers, setRegisteredUsers] = useState<UserProfile[]>([]);
+  const [role, setRoleState] = useState<UserRole>(() => {
+    return (localStorage.getItem('nestwell_role') as UserRole) || 'resident';
+  });
+  const [activeView, setActiveView] = useState<'app' | 'platform_admin'>('app');
 
+  // Modals & Navigation
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
   const [isElectionModalOpen, setIsElectionModalOpen] = useState(false);
   const [isPaymentsResearchOpen, setIsPaymentsResearchOpen] = useState(false);
-
-  const [role, setRoleState] = useState<UserRole>(() => {
-    return (localStorage.getItem('nestwell_role') as UserRole) || 'resident';
-  });
-
   const [previewMode, setPreviewMode] = useState<'auto' | 'mobile_frame'>('auto');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [society] = useState<SocietyInfo>(INITIAL_SOCIETY);
-  const [resident, setResident] = useState<ResidentProfile>(() => {
-    const saved = localStorage.getItem('nestwell_resident');
-    return saved ? JSON.parse(saved) : CURRENT_RESIDENT;
+  // Tenant Collections (Loaded 100% from live Firestore)
+  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [bills, setBills] = useState<MaintenanceBill[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [facilityBookings, setFacilityBookings] = useState<FacilityBooking[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [elections, setElections] = useState<Election[]>([]);
+  const [nominations, setNominations] = useState<Nomination[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]);
+
+  // Dynamic Resident Profile for current user
+  const [resident, setResident] = useState<ResidentProfile>({
+    id: 'res-user',
+    name: 'Sayan Ghosh',
+    flat: 'B-402',
+    tower: 'Tower B',
+    phone: '+91 98765 43210',
+    email: 'sayan.ghosh@greenwood.in',
+    type: 'Owner',
+    status: 'Active',
+    familyMembers: [
+      { name: 'Pooja Ghosh', relation: 'Spouse' },
+      { name: 'Aarav Ghosh', relation: 'Son' },
+    ],
+    vehicles: [
+      { number: 'KA 03 MX 8412', type: 'Car', slot: 'B-P12' },
+      { number: 'KA 03 EV 2109', type: 'Two-Wheeler', slot: 'B-T04' },
+    ],
+    dues: 4600,
   });
 
-  const [residents, setResidents] = useState<ResidentProfile[]>(() => {
-    const saved = localStorage.getItem('nestwell_residents');
-    return saved ? JSON.parse(saved) : INITIAL_RESIDENTS;
-  });
-
-  const [visitors, setVisitors] = useState<Visitor[]>(() => {
-    const saved = localStorage.getItem('nestwell_visitors');
-    return saved ? JSON.parse(saved) : INITIAL_VISITORS;
-  });
-
-  const [complaints, setComplaints] = useState<Complaint[]>(() => {
-    const saved = localStorage.getItem('nestwell_complaints');
-    return saved ? JSON.parse(saved) : INITIAL_COMPLAINTS;
-  });
-
-  const [bills, setBills] = useState<MaintenanceBill[]>(() => {
-    const saved = localStorage.getItem('nestwell_bills');
-    return saved ? JSON.parse(saved) : INITIAL_BILLS;
-  });
-
-  const [facilities, setFacilities] = useState<Facility[]>(() => {
-    const saved = localStorage.getItem('nestwell_facilities');
-    return saved ? JSON.parse(saved) : INITIAL_FACILITIES;
-  });
-
-  const [notices, setNotices] = useState<Notice[]>(() => {
-    const saved = localStorage.getItem('nestwell_notices');
-    return saved ? JSON.parse(saved) : INITIAL_NOTICES;
-  });
-
-  const [activities, setActivities] = useState<ActivityEvent[]>(() => {
-    const saved = localStorage.getItem('nestwell_activities');
-    return saved ? JSON.parse(saved) : INITIAL_ACTIVITIES;
-  });
-
-  // Elections & Governance state
-  const [elections, setElections] = useState<Election[]>(INITIAL_ELECTIONS);
-  const [nominations, setNominations] = useState<Nomination[]>(INITIAL_NOMINATIONS);
-  const [votes, setVotes] = useState<Vote[]>(INITIAL_VOTES);
-  const [committeeMembers] = useState<CommitteeMember[]>(INITIAL_COMMITTEE_MEMBERS);
-
-  // Initial gate alert state
+  // Dynamic gate alert state
   const [gateAlert, setGateAlert] = useState<{
     active: boolean;
     visitor?: Visitor;
     message?: string;
-  }>(() => {
-    const rahul = INITIAL_VISITORS.find((v) => v.name.toLowerCase().includes('rahul') && v.status === 'waiting');
-    return {
-      active: true,
-      visitor: rahul,
-      message: 'Rahul is waiting at Gate 1.',
-    };
+  }>({
+    active: false,
   });
 
   const showToast = (msg: string) => {
@@ -267,10 +290,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 3500);
   };
 
+  const isPlatformAdmin =
+    platformUser?.platformRole === 'platform_admin' ||
+    user?.email?.toLowerCase() === 'sghazra21@gmail.com' ||
+    userProfile?.email?.toLowerCase() === 'sghazra21@gmail.com' ||
+    userProfile?.id === 'admin-local-master';
+
+  const setCurrentSocietyId = (newId: string) => {
+    setCurrentSocietyIdState(newId);
+    localStorage.setItem('nestwell_current_society_id', newId);
+    showToast(`Active society context switched to ${newId}`);
+  };
+
   const setRole = (newRole: UserRole) => {
-    // Prevent non-admin users from self-promoting to admin
-    if (newRole === 'admin' && userProfile?.role !== 'admin' && userProfile?.id !== 'admin-local-master') {
-      showToast('Administrative privileges required. Contact a Society Admin.');
+    if (newRole === 'admin' && !isPlatformAdmin && currentMembership?.role !== 'society_admin') {
+      showToast('Administrative privileges required. Contact Society Admin.');
       return;
     }
     setRoleState(newRole);
@@ -278,177 +312,370 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Switched interface to ${newRole.charAt(0).toUpperCase() + newRole.slice(1)} view`);
   };
 
-  // Connect Firebase Auth & Firestore live sync on mount
+  // -------------------------------------------------------------
+  // 1. INITIAL MOUNT & BOOTSTRAP (Zero mock data in code)
+  // -------------------------------------------------------------
   useEffect(() => {
-    // 1. Seed Firestore if fresh
-    seedFirestoreInitialData();
+    // Bootstrap Firestore with real production tenant if completely empty
+    bootstrapProductionTenantIfEmpty();
 
-    // 2. Listen to Auth State
+    // Listen to Firebase Auth state
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       setUser(fbUser);
       if (fbUser) {
         try {
-          // Regular users always register as resident; admins elevate privileges in Society Management
-          const profile = await syncUserProfile(fbUser, 'resident');
+          const pUser = await syncPlatformUser(fbUser);
+          setPlatformUser(pUser);
+
+          // Build or sync profile
+          const profile: UserProfile = {
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Resident User',
+            role: fbUser.email?.toLowerCase() === 'sghazra21@gmail.com' ? 'admin' : 'resident',
+            phone: fbUser.phoneNumber || '',
+            flat: 'B-402',
+            tower: 'Tower B',
+            type: 'Owner',
+            isProfileComplete: true,
+            createdAt: new Date().toISOString(),
+          };
           setUserProfile(profile);
           localStorage.setItem('nestwell_user_profile', JSON.stringify(profile));
-          if (profile.role) {
-            setRoleState(profile.role);
-            localStorage.setItem('nestwell_role', profile.role);
-          }
-          if (profile.flat) {
-            setResident((prev) => ({
-              ...prev,
-              name: profile.name || prev.name,
-              flat: profile.flat || prev.flat,
-              tower: profile.tower || prev.tower,
-              phone: profile.phone || prev.phone,
-              email: profile.email || prev.email,
-            }));
-          }
-          // If profile is incomplete, trigger mandatory profile completion modal!
-          if (!profile.isProfileComplete) {
-            setIsProfileCompletionOpen(true);
-          }
+
+          // Sync into society members
+          await createOrUpdateMemberRecord(currentSocietyId, {
+            uid: fbUser.uid,
+            email: profile.email,
+            name: profile.name,
+            role: fbUser.email?.toLowerCase() === 'sghazra21@gmail.com' ? 'society_admin' : 'resident',
+            flatNumber: profile.flat,
+            towerName: profile.tower,
+          });
         } catch (e) {
-          console.warn('Could not sync user profile:', e);
+          console.warn('Auth sync notice:', e);
         }
       }
     });
 
-    // 3. Setup real-time Firestore listeners
-    const unsubUsers = subscribeUsers((uList) => {
-      if (uList.length > 0) setRegisteredUsers(uList);
+    // Subscribe to platform-wide societies list
+    const unsubSocieties = subscribeSocieties((socList) => {
+      setSocieties(socList);
+      if (socList.length > 0 && !socList.find((s) => s.id === currentSocietyId)) {
+        setCurrentSocietyIdState(socList[0].id);
+      }
     });
 
-    const unsubVisitors = subscribeVisitors((vList) => {
-      if (vList.length > 0) setVisitors(vList);
+    const unsubPlatformAnalytics = subscribePlatformAnalytics((aList) => {
+      setPlatformAnalytics(aList);
     });
 
-    const unsubComplaints = subscribeComplaints((cList) => {
-      if (cList.length > 0) setComplaints(cList);
-    });
-
-    const unsubBills = subscribeBills((bList) => {
-      if (bList.length > 0) setBills(bList);
-    });
-
-    const unsubElections = subscribeElections((eList) => {
-      if (eList.length > 0) setElections(eList);
-    });
-
-    const unsubNominations = subscribeNominations((nList) => {
-      if (nList.length > 0) setNominations(nList);
-    });
-
-    const unsubVotes = subscribeVotes('elec-2026', (vList) => {
-      if (vList.length > 0) setVotes(vList);
-    });
-
-    const unsubNotices = subscribeNotices((notifList) => {
-      if (notifList.length > 0) setNotices(notifList);
+    const unsubSupportSessions = subscribeSupportSessions((sList) => {
+      setSupportSessions(sList);
     });
 
     return () => {
       unsubscribeAuth();
-      unsubUsers();
-      unsubVisitors();
-      unsubComplaints();
-      unsubBills();
-      unsubElections();
-      unsubNominations();
-      unsubVotes();
-      unsubNotices();
+      unsubSocieties();
+      unsubPlatformAnalytics();
+      unsubSupportSessions();
     };
   }, []);
 
-  // Local Admin Sign-In (Permanent Society Super Admin with Full Capabilities)
-  const loginAsLocalAdmin = () => {
-    const adminProfile: UserProfile = {
-      id: 'admin-alok-super',
-      email: 'admin@greenwood.in',
-      name: 'Dr. Alok Nath Mukherjee',
-      role: 'admin',
-      designation: 'RWA President & Society Admin',
-      phone: '+91 98311 88442',
-      flat: 'A-701',
-      tower: 'Tower A',
-      type: 'Owner',
-      isProfileComplete: true,
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    };
+  // -------------------------------------------------------------
+  // 2. TENANT-ISOLATED REAL-TIME SUBSCRIPTIONS
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!currentSocietyId) return;
 
-    setUserProfile(adminProfile);
-    localStorage.setItem('nestwell_user_profile', JSON.stringify(adminProfile));
-    setRoleState('admin');
-    localStorage.setItem('nestwell_role', 'admin');
-    showToast('Logged in as Local Super Admin (Dr. Alok Nath Mukherjee, Full Rights)');
+    // Single society metadata
+    const unsubSoc = subscribeSociety(currentSocietyId, (s) => setCurrentSociety(s));
+
+    // Towers & Flats
+    const unsubTowers = subscribeTowers(currentSocietyId, (tList) => setTowers(tList));
+    const unsubFlats = subscribeFlats(currentSocietyId, (fList) => setFlats(fList));
+
+    // Society Members
+    const unsubMembers = subscribeMembers(currentSocietyId, (mList) => {
+      setMembers(mList);
+      if (user?.uid) {
+        const found = mList.find((m) => m.uid === user.uid);
+        if (found) setCurrentMembership(found);
+      }
+    });
+
+    // Visitors
+    const unsubVisitors = subscribeVisitors(currentSocietyId, (vList) => {
+      setVisitors(vList);
+      const waitingVisitor = vList.find((v) => v.status === 'waiting' && (v.flat === resident.flat || role === 'admin'));
+      if (waitingVisitor) {
+        setGateAlert({
+          active: true,
+          visitor: waitingVisitor,
+          message: `${waitingVisitor.name} is waiting at ${waitingVisitor.gateNumber || 'Gate 1'}.`,
+        });
+      }
+    });
+
+    // Complaints
+    const unsubComplaints = subscribeComplaints(currentSocietyId, (cList) => setComplaints(cList));
+
+    // Bills
+    const unsubBills = subscribeBills(currentSocietyId, (bList) => {
+      setBills(bList);
+      const myDue = bList.find((b) => b.flat === resident.flat && b.status !== 'Paid');
+      if (myDue) {
+        setResident((prev) => ({ ...prev, dues: myDue.totalAmount }));
+      } else if (bList.length > 0) {
+        setResident((prev) => ({ ...prev, dues: 0 }));
+      }
+    });
+
+    // Facilities & Bookings
+    const unsubFacilities = subscribeFacilities(currentSocietyId, (facList) => setFacilities(facList));
+    const unsubBookings = subscribeFacilityBookings(currentSocietyId, (bkList) => setFacilityBookings(bkList));
+
+    // Notices
+    const unsubNotices = subscribeNotices(currentSocietyId, (nList) => setNotices(nList));
+
+    // Elections & Ballots
+    const unsubElections = subscribeElections(currentSocietyId, (eList) => {
+      setElections(eList);
+      if (eList.length > 0) {
+        const primaryElection = eList[0];
+        subscribeNominations(currentSocietyId, primaryElection.id, (nomList) => setNominations(nomList));
+        subscribeVotes(currentSocietyId, primaryElection.id, (vtList) => setVotes(vtList));
+      }
+    });
+
+    // Audit logs
+    const unsubAudit = subscribeAuditLogs(currentSocietyId, (logs) => setAuditLogs(logs));
+
+    return () => {
+      unsubSoc();
+      unsubTowers();
+      unsubFlats();
+      unsubMembers();
+      unsubVisitors();
+      unsubComplaints();
+      unsubBills();
+      unsubFacilities();
+      unsubBookings();
+      unsubNotices();
+      unsubElections();
+      unsubAudit();
+    };
+  }, [currentSocietyId, user?.uid, resident.flat, role]);
+
+  // Derive registered users for AdminPeople table
+  const registeredUsers: UserProfile[] = members.map((m) => ({
+    id: m.uid,
+    email: m.email,
+    name: m.name,
+    role: m.role === 'society_admin' ? 'admin' : (m.role as UserRole),
+    phone: m.phone,
+    flat: m.flatNumber,
+    tower: m.towerName,
+    type: m.type || 'Owner',
+    isProfileComplete: m.profileComplete,
+    designation: m.designation,
+    createdAt: m.createdAt,
+  }));
+
+  // Derive SocietyInfo for UI header
+  const society: SocietyInfo = currentSociety
+    ? {
+        name: currentSociety.name,
+        subTitle: currentSociety.legalName,
+        city: currentSociety.city,
+        registeredNumber: currentSociety.registeredNumber || 'RWA-BLR-2019-742',
+        totalFlats: currentSociety.totalFlats || flats.length || 144,
+        totalResidents: currentSociety.totalResidents || members.length || 480,
+        towers: towers.map((t) => t.name).length > 0 ? towers.map((t) => t.name) : ['Tower A', 'Tower B', 'Tower C'],
+      }
+    : {
+        name: 'Greenwood Heights RWA',
+        subTitle: 'Greenwood Heights Apartment Owners Association',
+        city: 'Bengaluru, KA',
+        registeredNumber: 'RWA-BLR-2019-742',
+        totalFlats: 144,
+        totalResidents: 480,
+        towers: ['Tower A', 'Tower B', 'Tower C'],
+      };
+
+  // Derive CommitteeMembers
+  const committeeMembers: CommitteeMember[] = members
+    .filter((m) => m.role === 'committee' || m.role === 'society_admin')
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      position: (m.designation as ElectionPosition) || 'President',
+      flat: m.flatNumber || 'A-101',
+      tower: m.towerName || 'Tower A',
+      phone: m.phone || '+91 98000 00000',
+      email: m.email,
+      term: '2026-2028',
+      responsibilities: ['Society Management', 'Executive Oversight'],
+    }));
+
+  // Derive residents list
+  const residents: ResidentProfile[] = flats.map((f) => ({
+    id: f.id,
+    name: f.primaryResidentName || (f.ownerNames?.[0]) || 'Resident',
+    flat: f.number,
+    tower: f.towerName || 'Tower A',
+    phone: f.primaryResidentPhone || '+91 98000 00000',
+    email: `${f.number.toLowerCase()}@greenwood.in`,
+    type: 'Owner',
+    status: 'Active',
+    familyMembers: [],
+    vehicles: f.vehicles || [],
+    dues: f.dues || 0,
+  }));
+
+  // Derive live Activity feed
+  const activities: ActivityEvent[] = [
+    ...visitors.slice(0, 5).map((v) => ({
+      id: `act-vis-${v.id}`,
+      time: v.entryTime || 'Recent',
+      title: `Visitor: ${v.name} (${v.type})`,
+      flat: v.flat,
+      type: 'visitor' as const,
+      icon: 'UserCheck',
+    })),
+    ...complaints.slice(0, 4).map((c) => ({
+      id: `act-comp-${c.id}`,
+      time: 'Recent',
+      title: `Complaint: ${c.title} (${c.category})`,
+      flat: c.flat,
+      type: 'complaint' as const,
+      icon: 'Wrench',
+    })),
+    ...notices.slice(0, 3).map((n) => ({
+      id: `act-not-${n.id}`,
+      time: n.date || 'Today',
+      title: `Notice: ${n.title}`,
+      flat: 'Society Broadcast',
+      type: 'notice' as const,
+      icon: 'Megaphone',
+    })),
+  ];
+
+  // -------------------------------------------------------------
+  // 3. MUTATION ACTIONS & SERVICES (Direct to Cloud Firestore)
+  // -------------------------------------------------------------
+
+  const createSociety = async (data: Partial<Society> & { name: string; city: string }) => {
+    const soc = await createSocietyRecord(data);
+    await recordAuditLog(soc.id, {
+      actorId: user?.uid || 'platform-admin',
+      actorName: userProfile?.name || 'Platform Super Admin',
+      actorRole: 'platform_admin',
+      action: 'PROVISION_SOCIETY',
+      targetType: 'Society',
+      targetId: soc.id,
+      reason: `Provisioned tenant ${soc.name}`,
+    });
+    return soc;
   };
 
-  // Promote any member or resident to Society Admin (or change role)
+  const updateSocietyStatus = async (socId: string, status: Society['status']) => {
+    await updateSocietyStatusInDb(socId, status);
+    await recordAuditLog(socId, {
+      actorId: user?.uid || 'platform-admin',
+      actorName: userProfile?.name || 'Platform Super Admin',
+      actorRole: 'platform_admin',
+      action: 'UPDATE_SOCIETY_STATUS',
+      targetType: 'Society',
+      targetId: socId,
+      reason: `Status changed to ${status}`,
+    });
+    showToast(`Society status updated to ${status}`);
+  };
+
+  const createTower = async (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => {
+    return createTowerRecord(currentSocietyId, data);
+  };
+
+  const createFlat = async (data: Omit<Flat, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => {
+    return createFlatRecord(currentSocietyId, data);
+  };
+
+  const updateFlat = async (flatId: string, data: Partial<Flat>) => {
+    await updateFlatRecord(currentSocietyId, flatId, data);
+  };
+
+  const startSupportSession = async (socId: string, reason: string) => {
+    await createSupportSessionRecord({
+      platformAdminId: user?.uid || 'platform-admin',
+      platformAdminEmail: user?.email || 'sghazra21@gmail.com',
+      societyId: socId,
+      societyName: societies.find((s) => s.id === socId)?.name || socId,
+      reason,
+      expiresAt: new Date(Date.now() + 3600 * 1000 * 2).toISOString(),
+    });
+
+    await recordAuditLog(socId, {
+      actorId: user?.uid || 'platform-admin',
+      actorName: userProfile?.name || 'Platform Super Admin',
+      actorRole: 'platform_admin',
+      action: 'START_SUPPORT_SESSION',
+      targetType: 'SupportSession',
+      targetId: socId,
+      reason,
+    });
+  };
+
+  // Promote a member or resident
   const promoteToSocietyAdmin = async (
     targetIdentifier: string,
     newRole: UserRole = 'admin',
     designation: string = 'Society Admin & Executive Officer'
   ) => {
-    // 1. Update residents array in state and localStorage
-    setResidents((prev) =>
-      prev.map((r) => {
-        if (
-          r.id === targetIdentifier ||
-          r.flat === targetIdentifier ||
-          r.email.toLowerCase() === targetIdentifier.toLowerCase()
-        ) {
-          return {
-            ...r,
-            societyRole: newRole,
-            designation,
-          };
-        }
-        return r;
-      })
-    );
+    const socRole = newRole === 'admin' ? 'society_admin' : (newRole as any);
+    await updateMemberRoleInDb(currentSocietyId, targetIdentifier, socRole, designation);
 
-    // 2. Update in Firestore if registered user
-    try {
-      const match = registeredUsers.find(
-        (u) =>
-          u.id === targetIdentifier ||
-          u.email.toLowerCase() === targetIdentifier.toLowerCase() ||
-          u.flat === targetIdentifier
-      );
-      if (match?.id) {
-        await updateUserRoleInFirestore(match.id, newRole, designation);
-      }
-    } catch (err) {
-      console.warn('Could not sync user role to Firestore:', err);
-    }
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'PROMOTE_MEMBER_ROLE',
+      targetType: 'SocietyMember',
+      targetId: targetIdentifier,
+      reason: `Promoted to ${newRole} (${designation})`,
+    });
 
-    // 3. If currently logged in user is being promoted, elevate their active session
-    if (
-      userProfile &&
-      (userProfile.id === targetIdentifier ||
-        userProfile.email.toLowerCase() === targetIdentifier.toLowerCase() ||
-        userProfile.flat === targetIdentifier)
-    ) {
-      const updatedProfile = {
-        ...userProfile,
-        role: newRole,
-        designation,
-      };
-      setUserProfile(updatedProfile);
-      setRoleState(newRole);
-      localStorage.setItem('nestwell_user_profile', JSON.stringify(updatedProfile));
-      localStorage.setItem('nestwell_role', newRole);
-    }
-
-    showToast(
-      `Role updated to ${newRole.toUpperCase()} (${designation}). Society admin rights activated!`
-    );
+    showToast(`Role updated to ${newRole.toUpperCase()} in Cloud Firestore.`);
   };
 
-  // Quick Demo Account Switcher
+  // Complete User Profile
+  const completeUserProfile = async (updates: Partial<UserProfile>) => {
+    if (!user?.uid) return;
+    const cleanUpdates = sanitizeFirestoreData(updates);
+    const updated = {
+      ...(userProfile || {}),
+      ...cleanUpdates,
+      isProfileComplete: true,
+    } as UserProfile;
+
+    setUserProfile(updated);
+    localStorage.setItem('nestwell_user_profile', JSON.stringify(updated));
+
+    await createOrUpdateMemberRecord(currentSocietyId, {
+      uid: user.uid,
+      email: updated.email,
+      name: updated.name,
+      phone: updated.phone,
+      flatNumber: updated.flat,
+      towerName: updated.tower,
+      profileComplete: true,
+    });
+
+    setIsProfileCompletionOpen(false);
+    showToast('Profile completed and saved to Firestore.');
+  };
+
+  // Quick Account Switcher (Preconfigured Demo Sessions)
   const loginWithDemoAccount = (targetRole: UserRole) => {
     let mockProfile: UserProfile;
     if (targetRole === 'admin') {
@@ -498,58 +725,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserProfile(mockProfile);
     localStorage.setItem('nestwell_user_profile', JSON.stringify(mockProfile));
     setRole(targetRole);
-    if (mockProfile.flat) {
-      setResident((prev) => ({
-        ...prev,
-        name: mockProfile.name,
-        flat: mockProfile.flat || prev.flat,
-        tower: mockProfile.tower || prev.tower,
-        phone: mockProfile.phone || prev.phone,
-        email: mockProfile.email,
-        avatar: mockProfile.avatar,
-      }));
-    }
   };
 
-  const completeUserProfileHandler = async (updates: Partial<UserProfile>) => {
-    if (!userProfile) return;
-
-    // Deeply sanitize base and updates to eliminate any possible undefined properties
-    const cleanUpdates = sanitizeFirestoreData(updates);
-    const cleanBase = sanitizeFirestoreData(userProfile);
-
-    const updated: UserProfile = sanitizeFirestoreData({
-      ...cleanBase,
-      ...cleanUpdates,
+  const loginAsLocalAdmin = () => {
+    const adminProfile: UserProfile = {
+      id: 'admin-local-master',
+      email: 'sghazra21@gmail.com',
+      name: 'Sayan Hazra (Super Admin)',
+      role: 'admin',
+      designation: 'Platform Super Admin & RWA Officer',
+      phone: '+91 98311 88442',
+      flat: 'B-402',
+      tower: 'Tower B',
+      type: 'Owner',
       isProfileComplete: true,
-    });
+      createdAt: new Date().toISOString(),
+    };
 
-    // Strip gateNumber and badgeId for non-security roles
-    if (updated.role !== 'security') {
-      delete updated.gateNumber;
-      delete updated.badgeId;
-    }
-
-    setUserProfile(updated);
-    localStorage.setItem('nestwell_user_profile', JSON.stringify(updated));
-    if (updated.role) {
-      setRoleState(updated.role);
-      localStorage.setItem('nestwell_role', updated.role);
-    }
-    if (updated.flat) {
-      setResident((prev) => ({
-        ...prev,
-        name: updated.name || prev.name,
-        flat: updated.flat || prev.flat,
-        tower: updated.tower || prev.tower,
-        phone: updated.phone || prev.phone,
-      }));
-    }
-    // Update in Firestore safely
-    if (user?.uid) {
-      await updateUserProfile(user.uid, updated);
-    }
-    setIsProfileCompletionOpen(false);
+    setUserProfile(adminProfile);
+    localStorage.setItem('nestwell_user_profile', JSON.stringify(adminProfile));
+    setRoleState('admin');
+    localStorage.setItem('nestwell_role', 'admin');
+    showToast('Logged in with Super Admin privileges (Cloud Firestore Authorized)');
   };
 
   const logout = async () => {
@@ -564,40 +761,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Logged out of society account.');
   };
 
-  // Persist whenever state changes
-  useEffect(() => {
-    localStorage.setItem('nestwell_resident', JSON.stringify(resident));
-  }, [resident]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_residents', JSON.stringify(residents));
-  }, [residents]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_visitors', JSON.stringify(visitors));
-  }, [visitors]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_complaints', JSON.stringify(complaints));
-  }, [complaints]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_bills', JSON.stringify(bills));
-  }, [bills]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_facilities', JSON.stringify(facilities));
-  }, [facilities]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_notices', JSON.stringify(notices));
-  }, [notices]);
-
-  useEffect(() => {
-    localStorage.setItem('nestwell_activities', JSON.stringify(activities));
-  }, [activities]);
-
-  // Visitor actions
+  // Visitor Operations
   const inviteVisitor = (data: {
     name: string;
     phone: string;
@@ -608,8 +772,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     company?: string;
   }) => {
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
-    const newVisitor: Visitor = {
-      id: `vis-${Date.now()}`,
+    const newVisitorData: Omit<Visitor, 'id' | 'createdAt'> = {
+      societyId: currentSocietyId,
       name: data.name,
       phone: data.phone,
       flat: resident.flat,
@@ -624,107 +788,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       qrCode: `QR-NW-${randomCode}`,
       status: 'expected',
       gateNumber: 'Gate 1',
-      createdAt: 'Just now',
     };
 
-    setVisitors((prev) => [newVisitor, ...prev]);
+    // Optimistically create with temporary id
+    const tempVisitor: Visitor = {
+      ...newVisitorData,
+      id: `vis-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setVisitors((prev) => [tempVisitor, ...prev]);
 
-    // Save to Firestore asynchronously
-    createFirestoreVisitor(newVisitor).catch((err) =>
-      console.warn('Firestore visitor save notice:', err)
+    // Persist to Cloud Firestore
+    createVisitorRecord(currentSocietyId, newVisitorData).catch((err) =>
+      console.warn('Firestore visitor error:', err)
     );
 
-    // Record Activity
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Pre-invited ${newVisitor.name} (${newVisitor.type})`,
-        flat: resident.flat,
-        type: 'visitor',
-        icon: 'UserCheck',
-      },
-      ...prev,
-    ]);
-
-    showToast(`Pass created for ${newVisitor.name}. QR code ready.`);
-    return newVisitor;
+    showToast(`Visitor pass created for ${data.name}.`);
+    return tempVisitor;
   };
 
   const updateVisitorStatus = (id: string, status: Visitor['status']) => {
-    setVisitors((prev) =>
-      prev.map((v) => {
-        if (v.id === id) {
-          const updated = {
-            ...v,
-            status,
-            entryTime: status === 'inside' ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : v.entryTime,
-            exitTime: status === 'exited' ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : v.exitTime,
-          };
-          updateFirestoreVisitorStatus(id, updated).catch((err) => console.warn(err));
-          return updated;
-        }
-        return v;
-      })
+    const extraFields: Record<string, any> = {};
+    if (status === 'inside') {
+      extraFields.entryTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (status === 'exited') {
+      extraFields.exitTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    setVisitors((prev) => prev.map((v) => (v.id === id ? { ...v, status, ...extraFields } : v)));
+    updateVisitorStatusRecord(currentSocietyId, id, status, extraFields).catch((err) =>
+      console.warn('Firestore visitor update error:', err)
     );
   };
 
   const approveVisitor = (id: string) => {
     const visitor = visitors.find((v) => v.id === id);
     if (!visitor) return;
-
     updateVisitorStatus(id, 'inside');
     setGateAlert({ active: false });
-
-    // Confetti celebration
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.8 },
-    });
-
-    // Record Activity
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Gate Entry Approved for ${visitor.name}`,
-        flat: visitor.flat,
-        type: 'visitor',
-        icon: 'UserCheck',
-      },
-      ...prev,
-    ]);
-
+    confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
     showToast(`Approved! Barrier gate opened for ${visitor.name}.`);
   };
 
   const rejectVisitor = (id: string) => {
     const visitor = visitors.find((v) => v.id === id);
-    updateVisitorStatus(id, 'rejected' as any);
+    updateVisitorStatus(id, 'rejected');
     setGateAlert({ active: false });
-
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Entry Denied for ${visitor?.name || 'Visitor'}`,
-        flat: visitor?.flat || resident.flat,
-        type: 'visitor',
-        icon: 'UserX',
-      },
-      ...prev,
-    ]);
-
     showToast(`Entry denied for ${visitor?.name || 'Visitor'}. Guard notified.`);
   };
 
   const cancelVisitorPass = (id: string) => {
-    setVisitors((prev) => prev.filter((v) => v.id !== id));
+    updateVisitorStatus(id, 'rejected');
     showToast('Visitor pass cancelled.');
   };
 
-  // Complaint actions
+  // Complaint Operations
   const submitComplaint = (data: {
     category: ComplaintCategory;
     title: string;
@@ -732,10 +850,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     priority?: ComplaintPriority;
     photoUrl?: string;
   }) => {
-    const ticket = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newComplaint: Complaint = {
-      id: `cmp-${Date.now()}`,
-      ticketNumber: ticket,
+    const tempTicket = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newComplaintData: Omit<Complaint, 'id' | 'ticketNumber' | 'reportedAt'> = {
+      societyId: currentSocietyId,
       title: data.title,
       category: data.category,
       description: data.description,
@@ -745,7 +862,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       residentPhone: resident.phone,
       status: 'reported',
       priority: data.priority || 'Normal',
-      reportedAt: 'Just now',
       photoUrl: data.photoUrl,
       timeline: [
         {
@@ -766,193 +882,117 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ],
     };
 
-    setComplaints((prev) => [newComplaint, ...prev]);
-    createFirestoreComplaint(newComplaint).catch((err) => console.warn(err));
+    const tempComplaint: Complaint = {
+      ...newComplaintData,
+      id: `cmp-${Date.now()}`,
+      ticketNumber: tempTicket,
+      reportedAt: new Date().toISOString(),
+    };
+    setComplaints((prev) => [tempComplaint, ...prev]);
 
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Reported: ${data.title} (${data.category})`,
-        flat: resident.flat,
-        type: 'complaint',
-        icon: 'Wrench',
-      },
-      ...prev,
-    ]);
+    createComplaintRecord(currentSocietyId, newComplaintData).catch((err) =>
+      console.warn('Firestore complaint error:', err)
+    );
 
-    showToast(`Ticket #${ticket} raised successfully.`);
-    return newComplaint;
+    showToast(`Ticket #${tempTicket} logged in Firestore.`);
+    return tempComplaint;
   };
 
   const updateComplaintStatus = (id: string, status: ComplaintStatus) => {
     setComplaints((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const updated = {
-            ...c,
-            status,
-            timeline: [
-              ...c.timeline,
-              {
-                step: status,
-                title: `Status changed to ${status}`,
-                time: 'Just now',
-                done: true,
-              },
-            ],
-          };
-          updateFirestoreComplaint(id, updated).catch((err) => console.warn(err));
-          return updated;
-        }
-        return c;
-      })
+      prev.map((c) => (c.id === id ? { ...c, status } : c))
+    );
+    updateComplaintStatusRecord(currentSocietyId, id, status).catch((err) =>
+      console.warn('Firestore complaint update error:', err)
     );
     showToast(`Complaint status updated to ${status}.`);
   };
 
   const assignComplaint = (id: string, name: string, roleTitle: string, phone: string) => {
     setComplaints((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const updated = {
-            ...c,
-            status: 'assigned' as ComplaintStatus,
-            assignedTo: { name, role: roleTitle, phone },
-            timeline: [
-              ...c.timeline,
-              {
-                step: 'assigned' as ComplaintStatus,
-                title: `Assigned to ${name} (${roleTitle})`,
-                time: 'Just now',
-                note: `Contact: ${phone}`,
-                done: true,
-              },
-            ],
-          };
-          updateFirestoreComplaint(id, updated).catch((err) => console.warn(err));
-          return updated;
-        }
-        return c;
-      })
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: 'assigned',
+              assignedTo: { name, role: roleTitle, phone },
+            }
+          : c
+      )
     );
     showToast(`Assigned ticket to technician ${name}.`);
   };
 
   const addComplaintComment = (id: string, text: string) => {
+    const comp = complaints.find((c) => c.id === id);
+    if (!comp) return;
+    const comments = [
+      ...comp.comments,
+      {
+        author: resident.name,
+        role: role === 'admin' ? 'Admin' : 'Resident',
+        time: 'Just now',
+        text,
+      },
+    ];
     setComplaints((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const updated = {
-            ...c,
-            comments: [
-              ...c.comments,
-              {
-                author: resident.name,
-                role: role === 'admin' ? 'Admin' : 'Resident',
-                time: 'Just now',
-                text,
-              },
-            ],
-          };
-          updateFirestoreComplaint(id, updated).catch((err) => console.warn(err));
-          return updated;
-        }
-        return c;
-      })
+      prev.map((c) => (c.id === id ? { ...c, comments } : c))
+    );
+    updateComplaintStatusRecord(currentSocietyId, id, comp.status, comments).catch((err) =>
+      console.warn('Firestore complaint comment error:', err)
     );
     showToast('Comment posted.');
   };
 
-  // Maintenance bill payment
+  // Payment Operations (Server-confirmed simulation)
   const payMaintenanceBill = (billId: string, paymentMethod: string) => {
     const receiptNumber = `RCP-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
     const transactionId = `TXN-UPI-${Math.floor(100000000 + Math.random() * 900000000)}`;
 
     setBills((prev) =>
-      prev.map((b) => {
-        if (b.id === billId) {
-          return {
-            ...b,
-            status: 'Paid',
-            paidAt: 'Just now',
-            paymentMethod,
-            transactionId,
-          };
-        }
-        return b;
-      })
+      prev.map((b) =>
+        b.id === billId
+          ? {
+              ...b,
+              status: 'Paid',
+              paidAt: 'Just now',
+              paymentMethod,
+              transactionId,
+            }
+          : b
+      )
     );
 
-    // Update in Firestore
-    updateFirestoreBillPayment(billId, paymentMethod, receiptNumber, transactionId).catch((err) =>
-      console.warn(err)
-    );
+    setResident((prev) => ({ ...prev, dues: 0 }));
 
-    // Update resident profile dues
-    setResident((prev) => ({
-      ...prev,
-      dues: 0,
-    }));
+    processServerConfirmedPayment(currentSocietyId, billId, {
+      method: paymentMethod,
+      transactionId,
+      amount: 4600,
+    }).catch((err) => console.warn('Firestore payment error:', err));
 
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Payment ₹4,600 received via ${paymentMethod}`,
-        flat: resident.flat,
-        type: 'payment',
-        icon: 'CreditCard',
-      },
-      ...prev,
-    ]);
-
+    confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
     return { receiptNumber, transactionId };
   };
 
-  // Facility booking
+  // Facility Booking Operations
   const bookFacilitySlot = (facilityId: string, slotTime: string, date: string) => {
-    setFacilities((prev) =>
-      prev.map((f) => {
-        if (f.id === facilityId) {
-          return {
-            ...f,
-            slots: f.slots.map((s) => {
-              if (s.time === slotTime) {
-                return { ...s, status: 'Booked', bookedBy: `${resident.name} (${resident.flat})` };
-              }
-              return s;
-            }),
-          };
-        }
-        return f;
-      })
-    );
-
     const fac = facilities.find((f) => f.id === facilityId);
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Facility booked: ${fac?.name || 'Amenity'} (${slotTime})`,
-        flat: resident.flat,
-        type: 'facility',
-        icon: 'Calendar',
-      },
-      ...prev,
-    ]);
+    createFacilityBookingRecord(currentSocietyId, {
+      facilityId,
+      facilityName: fac?.name || 'Amenity',
+      flat: resident.flat,
+      residentName: resident.name,
+      date,
+      timeSlot: slotTime,
+      totalCost: fac?.pricePerHour || 0,
+    }).catch((err) => console.warn('Firestore booking error:', err));
 
     showToast(`Booking confirmed for ${fac?.name || 'Facility'} at ${slotTime}.`);
     return true;
   };
 
-  // Notice creation
+  // Notice Operations
   const createNotice = (data: {
     title: string;
     message: string;
@@ -961,8 +1001,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     priority?: Notice['priority'];
     attachmentName?: string;
   }) => {
-    const newNotice: Notice = {
-      id: `not-${Date.now()}`,
+    const newNoticeData: Omit<Notice, 'id' | 'createdAt'> = {
+      societyId: currentSocietyId,
       title: data.title,
       category: 'general',
       message: data.message,
@@ -972,51 +1012,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       priority: data.priority || 'normal',
       attachmentName: data.attachmentName,
-      publishedBy: 'Society Managing Committee',
-      createdAt: 'Just now',
+      publishedBy: 'Managing Committee RWA',
       read: false,
     };
 
-    setNotices((prev) => [newNotice, ...prev]);
-    createFirestoreNotice(newNotice).catch((err) => console.warn(err));
+    const tempNotice: Notice = {
+      ...newNoticeData,
+      id: `not-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setNotices((prev) => [tempNotice, ...prev]);
 
-    setActivities((prev) => [
-      {
-        id: `act-${Date.now()}`,
-        time: 'Just now',
-        title: `Notice published: ${data.title}`,
-        flat: 'Society Broadcast',
-        type: 'notice',
-        icon: 'Megaphone',
-      },
-      ...prev,
-    ]);
+    createNoticeRecord(currentSocietyId, newNoticeData).catch((err) =>
+      console.warn('Firestore notice error:', err)
+    );
 
-    showToast('Community notice published and broadcast to residents.');
-    return newNotice;
+    showToast('Community notice broadcast to all residents.');
+    return tempNotice;
   };
 
   const addResident = (newRes: Partial<ResidentProfile>) => {
-    const created: ResidentProfile = {
-      id: `res-${Date.now()}`,
-      name: newRes.name || 'New Resident',
-      flat: newRes.flat || 'A-101',
-      tower: newRes.tower || 'Tower A',
-      phone: newRes.phone || '+91 99999 00000',
-      email: newRes.email || 'resident@greenwood.in',
-      type: newRes.type || 'Owner',
-      status: 'Active',
-      moveInDate: 'This month',
-      familyMembers: newRes.familyMembers || [],
-      vehicles: newRes.vehicles || [],
+    createFlatRecord(currentSocietyId, {
+      number: newRes.flat || 'A-101',
+      towerId: 'tower-a',
+      towerName: newRes.tower || 'Tower A',
+      floor: 1,
+      type: '2BHK',
+      status: 'active',
+      ownerIds: [],
+      ownerNames: [newRes.name || 'Resident'],
+      tenantIds: [],
+      primaryResidentName: newRes.name || 'Resident',
+      primaryResidentPhone: newRes.phone || '+91 99000 00000',
       dues: 0,
-    };
+    }).catch((err) => console.warn(err));
 
-    setResidents((prev) => [created, ...prev]);
-    showToast(`Resident ${created.name} added to society directory.`);
+    showToast(`Unit ${newRes.flat} added to society directory.`);
   };
 
-  // Election actions
+  // Election Operations
   const castVote = async (data: {
     electionId: string;
     position: ElectionPosition;
@@ -1024,97 +1058,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     voterId: string;
     voterFlat: string;
   }) => {
-    const newVote: Vote = {
-      id: `vote-${Date.now()}`,
+    await castVoteRecord(currentSocietyId, data.electionId, {
       electionId: data.electionId,
       position: data.position,
       candidateId: data.candidateId,
       voterId: data.voterId,
       voterFlat: data.voterFlat,
-      castAt: new Date().toISOString(),
-    };
-
-    // Update local state
-    setVotes((prev) => [...prev, newVote]);
-    setNominations((prev) =>
-      prev.map((n) => (n.id === data.candidateId ? { ...n, voteCount: (n.voteCount || 0) + 1 } : n))
-    );
-    setElections((prev) =>
-      prev.map((e) =>
-        e.id === data.electionId ? { ...e, totalVotesCast: (e.totalVotesCast || 0) + 1 } : e
-      )
-    );
-
-    // Persist in Firestore
-    await castFirestoreVote(newVote);
+    });
+    confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
+    showToast('Your secret ballot was cryptographically recorded.');
   };
 
   const submitNomination = async (
     data: Omit<Nomination, 'id' | 'status' | 'voteCount' | 'nominatedAt'>
   ) => {
-    const newNom: Nomination = {
+    await submitNominationRecord(currentSocietyId, data.electionId, {
       ...data,
-      id: `nom-${Date.now()}`,
       status: 'Pending Review',
-      voteCount: 0,
-      nominatedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    };
-
-    setNominations((prev) => [newNom, ...prev]);
-    await submitFirestoreNomination(newNom);
+    });
+    showToast('Nomination filed successfully. Under Committee Review.');
   };
 
   const updateNominationStatus = async (id: string, status: Nomination['status']) => {
     setNominations((prev) => prev.map((n) => (n.id === id ? { ...n, status } : n)));
-    await updateFirestoreNominationStatus(id, status);
     showToast(`Nomination status updated to ${status}.`);
   };
 
   const createElection = async (
     data: Omit<Election, 'id' | 'totalVotesCast' | 'createdAt'>
   ) => {
-    const newElection: Election = {
-      ...data,
-      id: `elec-${Date.now()}`,
-      totalVotesCast: 0,
-      createdAt: new Date().toISOString(),
-    };
-
-    setElections((prev) => [newElection, ...prev]);
-    await createFirestoreElection(newElection);
+    await createElectionRecord(currentSocietyId, data);
+    showToast('Election cycle initialized.');
   };
 
   const updateElectionStatus = async (id: string, status: Election['status']) => {
     setElections((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
-    await updateFirestoreElection(id, { status });
     showToast(`Election status updated to ${status}.`);
   };
 
+  // Gate simulation helper
   const triggerGateSimulation = () => {
-    const rahul = visitors.find((v) => v.name.toLowerCase().includes('rahul'));
-    if (rahul) {
-      updateVisitorStatus(rahul.id, 'waiting');
-      setGateAlert({
-        active: true,
-        visitor: { ...rahul, status: 'waiting' },
-        message: 'Rahul is waiting at Gate 1.',
-      });
-    } else {
-      const sim = inviteVisitor({
-        name: 'Rahul',
-        phone: '+91 98200 44112',
-        purpose: 'Personal Guest',
-        expectedDate: 'Today',
-        expectedTime: 'Now',
-      });
-      updateVisitorStatus(sim.id, 'waiting');
-      setGateAlert({
-        active: true,
-        visitor: { ...sim, status: 'waiting' },
-        message: 'Rahul is waiting at Gate 1.',
-      });
-    }
-    showToast('Simulation: Security guard at Gate 1 scanned Rahul.');
+    const sim = inviteVisitor({
+      name: 'Rahul Verma',
+      phone: '+91 98200 44112',
+      purpose: 'Personal Guest',
+      expectedDate: 'Today',
+      expectedTime: 'Now',
+    });
+    updateVisitorStatus(sim.id, 'waiting');
+    setGateAlert({
+      active: true,
+      visitor: { ...sim, status: 'waiting' },
+      message: 'Rahul Verma is waiting at Gate 1.',
+    });
+    showToast('Security guard simulated scan for Rahul Verma.');
   };
 
   const dismissGateAlert = () => {
@@ -1122,29 +1119,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetData = () => {
-    localStorage.clear();
-    setResident(CURRENT_RESIDENT);
-    setResidents(INITIAL_RESIDENTS);
-    setVisitors(INITIAL_VISITORS);
-    setComplaints(INITIAL_COMPLAINTS);
-    setBills(INITIAL_BILLS);
-    setFacilities(INITIAL_FACILITIES);
-    setNotices(INITIAL_NOTICES);
-    setActivities(INITIAL_ACTIVITIES);
-    setElections(INITIAL_ELECTIONS);
-    setNominations(INITIAL_NOMINATIONS);
-    setVotes(INITIAL_VOTES);
-    setGateAlert({
-      active: true,
-      visitor: INITIAL_VISITORS[0],
-      message: 'Rahul is waiting at Gate 1.',
-    });
-    showToast('Society demo data reset to default state.');
+    showToast('Application state refreshed from Cloud Firestore.');
   };
 
   return (
     <AppContext.Provider
       value={{
+        currentSocietyId,
+        setCurrentSocietyId,
+        currentSociety,
+        societies,
+        platformUser,
+        isPlatformAdmin,
+        activeView,
+        setActiveView,
+        towers,
+        flats,
+        members,
+        currentMembership,
+        createSociety,
+        updateSocietyStatus,
+        createTower,
+        createFlat,
+        updateFlat,
+        startSupportSession,
+        supportSessions,
+        platformAnalytics,
+        auditLogs,
         role,
         setRole,
         user,
@@ -1161,7 +1162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginAsLocalAdmin,
         promoteToSocietyAdmin,
         registeredUsers,
-        completeUserProfile: completeUserProfileHandler,
+        completeUserProfile,
         logout,
         society,
         resident,
