@@ -89,7 +89,7 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
         isOpen={isOpen}
         onClose={handleReset}
         title={paymentResult ? 'Payment Status' : 'Pay Maintenance'}
-        subtitle={paymentResult ? 'Society Account Credited' : `Flat ${resident.flat} • ${activeBill?.month || 'No active bill'}`}
+        subtitle={paymentResult ? 'Society Account Credited' : `Flat ${resident.flat} • ${activeBill?.billingPeriod || activeBill?.month || 'No active bill'}`}
         maxWidth="md"
       >
         {!paymentResult ? (
@@ -117,23 +117,34 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
 
               {/* Itemized Breakdown */}
               <div className="mt-4 pt-3 border-t border-slate-200/80 space-y-1.5 text-left text-xs">
-                {activeBill?.maintenanceFee != null && activeBill.maintenanceFee > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Monthly Maintenance</span>
-                  <span className="font-semibold text-slate-900">₹{activeBill.maintenanceFee.toLocaleString('en-IN')}</span>
-                </div>
-                )}
-                {activeBill?.parkingFee != null && activeBill.parkingFee > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Parking</span>
-                  <span className="font-semibold text-slate-900">₹{activeBill.parkingFee.toLocaleString('en-IN')}</span>
-                </div>
-                )}
-                {activeBill?.lateFee != null && activeBill.lateFee > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Late Fee</span>
-                  <span className="font-semibold text-slate-900">₹{activeBill.lateFee.toLocaleString('en-IN')}</span>
-                </div>
+                {activeBill?.lineItems && activeBill.lineItems.length > 0 ? (
+                  activeBill.lineItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-slate-600">
+                      <span>{item.description}</span>
+                      <span className="font-semibold text-slate-900">₹{item.amount.toLocaleString('en-IN')}</span>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    {activeBill?.maintenanceFee != null && activeBill.maintenanceFee > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Monthly Maintenance</span>
+                      <span className="font-semibold text-slate-900">₹{activeBill.maintenanceFee.toLocaleString('en-IN')}</span>
+                    </div>
+                    )}
+                    {activeBill?.parkingFee != null && activeBill.parkingFee > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Parking</span>
+                      <span className="font-semibold text-slate-900">₹{activeBill.parkingFee.toLocaleString('en-IN')}</span>
+                    </div>
+                    )}
+                    {activeBill?.lateFee != null && activeBill.lateFee > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Late Fee</span>
+                      <span className="font-semibold text-slate-900">₹{activeBill.lateFee.toLocaleString('en-IN')}</span>
+                    </div>
+                    )}
+                  </>
                 )}
                 <div className="pt-2 border-t border-dashed border-slate-300 flex justify-between font-bold text-sm text-slate-900">
                   <span>Total Due</span>
@@ -458,23 +469,34 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
               </div>
 
               <div className="border-t border-b py-2 space-y-1 text-[11px]">
-                {activeBill?.maintenanceFee != null && activeBill.maintenanceFee > 0 && (
-                <div className="flex justify-between">
-                  <span>Monthly Maintenance (SAC 999598)</span>
-                  <span>₹{activeBill.maintenanceFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-                )}
-                {activeBill?.parkingFee != null && activeBill.parkingFee > 0 && (
-                <div className="flex justify-between">
-                  <span>Parking Slot</span>
-                  <span>₹{activeBill.parkingFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-                )}
-                {activeBill?.lateFee != null && activeBill.lateFee > 0 && (
-                <div className="flex justify-between">
-                  <span>Late Processing Fee</span>
-                  <span>₹{activeBill.lateFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
+                {activeBill?.lineItems && activeBill.lineItems.length > 0 ? (
+                  activeBill.lineItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between">
+                      <span>{item.description}</span>
+                      <span>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    {activeBill?.maintenanceFee != null && activeBill.maintenanceFee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Monthly Maintenance (SAC 999598)</span>
+                      <span>₹{activeBill.maintenanceFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    )}
+                    {activeBill?.parkingFee != null && activeBill.parkingFee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Parking Slot</span>
+                      <span>₹{activeBill.parkingFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    )}
+                    {activeBill?.lateFee != null && activeBill.lateFee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Late Processing Fee</span>
+                      <span>₹{activeBill.lateFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    )}
+                  </>
                 )}
                 <div className="border-t pt-1 flex justify-between font-bold text-xs text-slate-900">
                   <span>Total Amount Paid</span>

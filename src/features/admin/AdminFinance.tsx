@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MaintenanceBill } from '../../types';
+import { MaintenanceBill, BillLineItem } from '../../types';
 import {
   CreditCard,
   Search,
@@ -11,21 +11,94 @@ import {
   ArrowDownToLine,
   Phone,
   FileSpreadsheet,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 
 export const AdminFinance: React.FC = () => {
-  const { bills, markBillPaidManually, showToast } = useApp();
+  const { bills, flats, members, createBill, markBillPaidManually, showToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Overdue' | 'Due'>('all');
+  const [isCreateBillOpen, setIsCreateBillOpen] = useState(false);
 
-  const totalBilled = bills.reduce((sum, b) => sum + b.amount, 0);
+  const [selectedFlatId, setSelectedFlatId] = useState('');
+  const [billMonth, setBillMonth] = useState(() => {
+    const d = new Date();
+    return d.toLocaleString('en-US', { month: 'long' });
+  });
+  const [billYear, setBillYear] = useState(new Date().getFullYear());
+  const [billDueDate, setBillDueDate] = useState(() => {
+    const d = new Date();
+    d.setDate(15);
+    return d.toISOString().split('T')[0];
+  });
+  const [lineItems, setLineItems] = useState<BillLineItem[]>([
+    { description: 'Monthly Maintenance', amount: 4000, type: 'maintenance' },
+  ]);
+
+  const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  const totalAmount = subtotal;
+
+  const handleAddLineItem = () => {
+    setLineItems([...lineItems, { description: '', amount: 0, type: 'other' }]);
+  };
+
+  const handleRemoveLineItem = (index: number) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const handleLineItemChange = (index: number, field: keyof BillLineItem, value: string | number) => {
+    const updated = lineItems.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    );
+    setLineItems(updated);
+  };
+
+  const handleCreateBill = async () => {
+    if (!selectedFlatId) {
+      showToast('Please select a flat');
+      return;
+    }
+    if (lineItems.length === 0 || lineItems.every((i) => i.amount === 0)) {
+      showToast('Add at least one line item with a non-zero amount');
+      return;
+    }
+    const flat = flats.find((f) => f.id === selectedFlatId);
+    if (!flat) {
+      showToast('Selected flat not found');
+      return;
+    }
+    const member = members.find(
+      (m) => m.flatId === selectedFlatId || m.flatNumber === flat.number
+    );
+    const residentName = member?.name || flat.primaryResidentName || 'Resident';
+
+    await createBill(
+      selectedFlatId,
+      flat.number,
+      flat.towerName,
+      residentName,
+      billMonth,
+      billYear,
+      totalAmount,
+      billDueDate,
+      lineItems
+    );
+    setIsCreateBillOpen(false);
+    setSelectedFlatId('');
+    setLineItems([{ description: 'Monthly Maintenance', amount: 4000, type: 'maintenance' }]);
+  };
+
+  const totalBilled = bills.reduce((sum, b) => sum + b.totalAmount, 0);
   const totalCollected = bills
     .filter((b) => b.status === 'Paid')
-    .reduce((sum, b) => sum + b.amount, 0);
+    .reduce((sum, b) => sum + b.totalAmount, 0);
   const totalOverdue = bills
     .filter((b) => b.status === 'Overdue')
-    .reduce((sum, b) => sum + b.amount, 0);
+    .reduce((sum, b) => sum + b.totalAmount, 0);
+
+  const currentBillingPeriod = bills.length > 0 ? (bills[0].billingPeriod || `${bills[0].month} ${bills[0].year}`) : 'No bills yet';
 
   const filteredBills = bills.filter((b) => {
     const matchSearch =
@@ -50,11 +123,19 @@ export const AdminFinance: React.FC = () => {
             Society Maintenance & Accounts
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Maintenance billing overview for the current cycle.
+            Maintenance billing overview — {currentBillingPeriod}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCreateBillOpen(!isCreateBillOpen)}
+            className="h-10 px-4 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create Bill</span>
+          </button>
+
           <button
             onClick={handleSendBulkReminders}
             className="h-10 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
@@ -73,17 +154,161 @@ export const AdminFinance: React.FC = () => {
         </div>
       </div>
 
+      {/* Create Bill Form */}
+      {isCreateBillOpen && (
+        <div className="bg-white p-5 rounded-2xl border border-indigo-200 shadow-sm space-y-4">
+          <h3 className="text-sm font-extrabold text-slate-900">Create New Maintenance Bill</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Select Flat</label>
+              <select
+                value={selectedFlatId}
+                onChange={(e) => setSelectedFlatId(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800"
+              >
+                <option value="">Choose a flat...</option>
+                {flats.filter((f) => f.status === 'active').map((f) => {
+                  const member = members.find(
+                    (m) => m.flatId === f.id || m.flatNumber === f.number
+                  );
+                  return (
+                    <option key={f.id} value={f.id}>
+                      Flat {f.number} — {f.towerName || f.towerId} {member ? `(${member.name})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Billing Month</label>
+              <select
+                value={billMonth}
+                onChange={(e) => setBillMonth(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800"
+              >
+                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Year</label>
+              <select
+                value={billYear}
+                onChange={(e) => setBillYear(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800"
+              >
+                {[new Date().getFullYear(), new Date().getFullYear() + 1].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Due Date</label>
+              <input
+                type="date"
+                value={billDueDate}
+                onChange={(e) => setBillDueDate(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800"
+              />
+            </div>
+          </div>
+
+          {/* Line Items */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-bold text-slate-600 uppercase">Line Items</label>
+              <button
+                onClick={handleAddLineItem}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Add Item
+              </button>
+            </div>
+            <div className="space-y-2">
+              {lineItems.map((item, index) => (
+                <div key={index} className="flex gap-2 items-center">
+                  <select
+                    value={item.type}
+                    onChange={(e) => handleLineItemChange(index, 'type', e.target.value)}
+                    className="h-9 w-32 px-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-700"
+                  >
+                    <option value="maintenance">Maintenance</option>
+                    <option value="parking">Parking</option>
+                    <option value="water">Water</option>
+                    <option value="electricity">Electricity</option>
+                    <option value="late_fee">Late Fee</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={item.description}
+                    onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
+                    placeholder="Description"
+                    className="flex-1 h-9 px-3 rounded-lg border border-slate-200 text-xs font-medium text-slate-800"
+                  />
+                  <input
+                    type="number"
+                    value={item.amount || ''}
+                    onChange={(e) => handleLineItemChange(index, 'amount', Number(e.target.value))}
+                    placeholder="₹0"
+                    className="h-9 w-28 px-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-800"
+                  />
+                  {lineItems.length > 1 && (
+                    <button
+                      onClick={() => handleRemoveLineItem(index)}
+                      className="h-9 w-9 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex justify-end items-center gap-4 text-xs">
+              <span className="text-slate-500">Subtotal:</span>
+              <span className="font-extrabold text-slate-900">₹{subtotal.toLocaleString()}</span>
+              <span className="text-slate-400 mx-1">|</span>
+              <span className="text-slate-500">Total:</span>
+              <span className="font-extrabold text-indigo-700 text-sm">₹{totalAmount.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              onClick={() => setIsCreateBillOpen(false)}
+              className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateBill}
+              className="h-9 px-5 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold shadow-sm transition-colors"
+            >
+              Create & Issue Bill
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 3 Large KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Total Billed ({bills.length > 0 ? bills[0].month : 'No bills'})
+            Total Billed ({currentBillingPeriod})
           </span>
           <div className="text-3xl font-extrabold text-slate-900 mt-1">
             ₹{totalBilled.toLocaleString()}
           </div>
           <span className="text-xs text-slate-500 mt-1 block">
-            140 Units (Standard ₹4,000 + Parking ₹500)
+            {bills.length} Invoice{bills.length !== 1 ? 's' : ''} Issued
           </span>
         </div>
 
@@ -171,10 +396,10 @@ export const AdminFinance: React.FC = () => {
 
                   <td className="px-5 py-4 font-bold text-slate-900">{b.residentName}</td>
 
-                  <td className="px-5 py-4 text-xs text-slate-600 font-medium">{b.month}</td>
+                  <td className="px-5 py-4 text-xs text-slate-600 font-medium">{b.billingPeriod || `${b.month} ${b.year}`}</td>
 
                   <td className="px-5 py-4 font-extrabold text-slate-900">
-                    ₹{b.amount.toLocaleString()}
+                    ₹{b.totalAmount.toLocaleString()}
                   </td>
 
                   <td className="px-5 py-4">

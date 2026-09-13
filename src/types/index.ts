@@ -127,6 +127,14 @@ export interface Complaint {
   comments: { author: string; role: string; time: string; text: string }[];
 }
 
+export type LineItemType = 'maintenance' | 'parking' | 'late_fee' | 'water' | 'electricity' | 'other';
+
+export interface BillLineItem {
+  description: string;
+  amount: number;
+  type: LineItemType;
+}
+
 export interface MaintenanceBill {
   id: string;
   societyId?: string;
@@ -146,6 +154,9 @@ export interface MaintenanceBill {
   paymentMethod?: string;
   transactionId?: string;
   createdAt?: string;
+  lineItems?: BillLineItem[];
+  subtotal?: number;
+  billingPeriod?: string;
 }
 
 export interface Facility {

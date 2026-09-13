@@ -165,6 +165,17 @@ interface AppContextType {
   assignComplaint: (id: string, name: string, role: string, phone: string) => void;
   addComplaintComment: (id: string, text: string) => void;
   bills: MaintenanceBill[];
+  createBill: (
+    flatId: string,
+    flatNumber: string,
+    towerName: string,
+    residentName: string,
+    month: string,
+    year: number,
+    amount: number,
+    dueDate: string,
+    lineItems?: MaintenanceBill['lineItems']
+  ) => Promise<string>;
   payMaintenanceBill: (billId: string, paymentMethod: string) => { receiptNumber: string; transactionId: string };
   markBillPaidManually: (billId: string, method: string) => Promise<void>;
   facilities: Facility[];
@@ -1089,6 +1100,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Offline payment recorded.');
   };
 
+  const createBill = async (
+    flatId: string,
+    flatNumber: string,
+    towerName: string,
+    residentName: string,
+    month: string,
+    year: number,
+    amount: number,
+    dueDate: string,
+    lineItems?: MaintenanceBill['lineItems']
+  ): Promise<string> => {
+    const subtotal = lineItems ? lineItems.reduce((sum, item) => sum + item.amount, 0) : amount;
+    const billingPeriod = `${month} ${year}`;
+    const newBill = await createBillRecord(currentSocietyId, {
+      societyId: currentSocietyId,
+      flat: flatNumber,
+      tower: towerName,
+      residentName,
+      month,
+      year,
+      maintenanceFee: lineItems?.find((i) => i.type === 'maintenance')?.amount ?? amount,
+      parkingFee: lineItems?.find((i) => i.type === 'parking')?.amount ?? 0,
+      lateFee: lineItems?.find((i) => i.type === 'late_fee')?.amount ?? 0,
+      totalAmount: amount,
+      status: 'Pending',
+      dueDate,
+      lineItems,
+      subtotal,
+      billingPeriod,
+    });
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'CREATE_BILL',
+      targetType: 'MaintenanceBill',
+      targetId: newBill.id,
+      reason: `Bill created for Flat ${flatNumber} — ${billingPeriod} — ₹${amount.toLocaleString()}`,
+    });
+    showToast(`Bill created for Flat ${flatNumber} — ${billingPeriod}`);
+    return newBill.id;
+  };
+
   // Facility Booking Operations
   const bookFacilitySlot = (facilityId: string, slotTime: string, date: string) => {
     const fac = facilities.find((f) => f.id === facilityId);
@@ -1283,6 +1337,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignComplaint,
         addComplaintComment,
         bills,
+        createBill,
         payMaintenanceBill,
         markBillPaidManually,
         facilities,
