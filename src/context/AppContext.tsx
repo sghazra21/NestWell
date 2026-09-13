@@ -146,6 +146,8 @@ interface AppContextType {
     company?: string;
   }) => Visitor;
   updateVisitorStatus: (id: string, status: Visitor['status']) => void;
+  securityCheckIn: (visitorId: string) => void;
+  securityCheckOut: (visitorId: string) => void;
   approveVisitor: (id: string) => void;
   rejectVisitor: (id: string) => void;
   cancelVisitorPass: (id: string) => void;
@@ -887,6 +889,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Visitor pass cancelled.');
   };
 
+  const securityCheckIn = (visitorId: string) => {
+    const visitor = visitors.find((v) => v.id === visitorId);
+    if (!visitor) return;
+    const now = new Date();
+    const entryTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setVisitors((prev) => prev.map((v) => (v.id === visitorId ? { ...v, status: 'inside' as Visitor['status'], entryTime } : v)));
+    updateVisitorStatusRecord(currentSocietyId, visitorId, 'inside', { entryTime }).catch((err) =>
+      console.warn('Firestore security check-in error:', err)
+    );
+    setGateAlert({ active: false });
+    showToast(`${visitor.name} checked in at gate.`);
+  };
+
+  const securityCheckOut = (visitorId: string) => {
+    const visitor = visitors.find((v) => v.id === visitorId);
+    if (!visitor) return;
+    const now = new Date();
+    const exitTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setVisitors((prev) => prev.map((v) => (v.id === visitorId ? { ...v, status: 'exited' as Visitor['status'], exitTime } : v)));
+    updateVisitorStatusRecord(currentSocietyId, visitorId, 'exited', { exitTime }).catch((err) =>
+      console.warn('Firestore security check-out error:', err)
+    );
+    showToast(`${visitor.name} checked out from gate.`);
+  };
+
   // Complaint Operations
   const submitComplaint = (data: {
     category: ComplaintCategory;
@@ -1224,6 +1251,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         visitors,
         inviteVisitor,
         updateVisitorStatus,
+        securityCheckIn,
+        securityCheckOut,
         approveVisitor,
         rejectVisitor,
         cancelVisitorPass,
