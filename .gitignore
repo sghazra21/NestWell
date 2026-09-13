@@ -11,4 +11,3 @@ graphify-out/
 .firebase/
 .firebase-hosting*.cache
 AGENTS.md
-package-lock.json
