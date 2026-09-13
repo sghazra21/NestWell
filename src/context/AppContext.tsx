@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import {
   UserRole,
@@ -30,6 +30,7 @@ import {
   SupportSession,
   AuditLog,
   PaymentRecord,
+  AppNotification,
 } from '../types';
 import {
   auth,
@@ -88,6 +89,10 @@ import {
   createPaymentRecord,
   updatePaymentRecord,
   subscribePayments,
+  createNotificationRecord,
+  subscribeNotifications,
+  markNotificationRead as markNotificationReadInDb,
+  markAllNotificationsRead as markAllNotificationsReadInDb,
 } from '../lib/firestoreService';
 
 interface AppContextType {
@@ -192,6 +197,7 @@ interface AppContextType {
   verifyPayment: (paymentId: string) => Promise<void>;
   rejectPayment: (paymentId: string, reason: string) => Promise<void>;
   facilities: Facility[];
+  facilityBookings: FacilityBooking[];
   bookFacilitySlot: (facilityId: string, slotTime: string, date: string) => boolean;
   notices: Notice[];
   createNotice: (data: {
@@ -236,6 +242,12 @@ interface AppContextType {
   setPreviewMode: (mode: 'auto' | 'mobile_frame') => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
+
+  // Notifications
+  notifications: AppNotification[];
+  unreadCount: number;
+  markNotificationRead: (notificationId: string) => void;
+  markAllNotificationsRead: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -285,6 +297,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   // Resident profile for the current user, populated from society membership.
   // Empty until the user's membership and flat assignment resolve.
@@ -429,7 +442,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // -------------------------------------------------------------
   // 2. TENANT-ISOLATED REAL-TIME SUBSCRIPTIONS
+  // Use refs for values that change frequently but shouldn't
+  // re-subscribe all Firestore listeners.
   // -------------------------------------------------------------
+  const residentFlatRef = useRef(resident.flat);
+  residentFlatRef.current = resident.flat;
+  const roleRef = useRef(role);
+  roleRef.current = role;
+
   useEffect(() => {
     if (!currentSocietyId) return;
 
@@ -451,7 +471,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Visitors
     const unsubVisitors = subscribeVisitors(currentSocietyId, (vList) => {
       setVisitors(vList);
-      const waitingVisitor = vList.find((v) => v.status === 'waiting' && (v.flat === resident.flat || role === 'admin'));
+      const waitingVisitor = vList.find(
+        (v) => v.status === 'waiting' && (v.flat === residentFlatRef.current || roleRef.current === 'admin')
+      );
       if (waitingVisitor) {
         setGateAlert({
           active: true,
@@ -467,7 +489,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Bills
     const unsubBills = subscribeBills(currentSocietyId, (bList) => {
       setBills(bList);
-      const myDue = bList.find((b) => b.flat === resident.flat && b.status !== 'Paid');
+      const myDue = bList.find((b) => b.flat === residentFlatRef.current && b.status !== 'Paid');
       if (myDue) {
         setResident((prev) => ({ ...prev, dues: myDue.totalAmount }));
       } else if (bList.length > 0) {
@@ -482,18 +504,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Notices
     const unsubNotices = subscribeNotices(currentSocietyId, (nList) => setNotices(nList));
 
-    // Elections & Ballots
+    // Elections & Ballots — track nested subscriptions to avoid leaks
+    let unsubNoms: (() => void) | null = null;
+    let unsubVts: (() => void) | null = null;
     const unsubElections = subscribeElections(currentSocietyId, (eList) => {
       setElections(eList);
+      // Clean up previous nested subscriptions
+      unsubNoms?.();
+      unsubVts?.();
       if (eList.length > 0) {
         const primaryElection = eList[0];
-        subscribeNominations(currentSocietyId, primaryElection.id, (nomList) => setNominations(nomList));
-        subscribeVotes(currentSocietyId, primaryElection.id, (vtList) => setVotes(vtList));
+        unsubNoms = subscribeNominations(currentSocietyId, primaryElection.id, (nomList) => setNominations(nomList));
+        unsubVts = subscribeVotes(currentSocietyId, primaryElection.id, (vtList) => setVotes(vtList));
+      } else {
+        setNominations([]);
+        setVotes([]);
       }
     });
 
     // Payments (UPI / UTR verification)
     const unsubPayments = subscribePayments(currentSocietyId, (pList) => setPayments(pList));
+
+    // Notifications
+    const unsubNotifications = user?.uid
+      ? subscribeNotifications(currentSocietyId, user.uid, (nList) => setNotifications(nList))
+      : () => {};
 
     // Audit logs
     const unsubAudit = subscribeAuditLogs(currentSocietyId, (logs) => setAuditLogs(logs));
@@ -510,10 +545,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubBookings();
       unsubNotices();
       unsubElections();
+      unsubNoms?.();
+      unsubVts?.();
       unsubPayments();
+      unsubNotifications();
       unsubAudit();
     };
-  }, [currentSocietyId, user?.uid, resident.flat, role]);
+  }, [currentSocietyId, user?.uid]);
 
   // -------------------------------------------------------------
   // 2b. ROLE DERIVATION (membership is authoritative)
@@ -909,6 +947,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Logged out of society account.');
   };
 
+  // Notification Operations
+  const markNotificationRead = (notificationId: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+    );
+    markNotificationReadInDb(currentSocietyId, notificationId).catch((err) =>
+      console.warn('Firestore notification read error:', err)
+    );
+  };
+
+  const markAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (user?.uid) {
+      markAllNotificationsReadInDb(currentSocietyId, user.uid).catch((err) =>
+        console.warn('Firestore mark all read error:', err)
+      );
+    }
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   // Visitor Operations
   const inviteVisitor = (data: {
     name: string;
@@ -1180,6 +1239,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes,
     });
 
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'resident',
+      actorName: resident.name || userProfile?.name || 'Resident',
+      actorRole: role,
+      action: 'PAYMENT_CLAIM_SUBMITTED',
+      targetType: 'PaymentRecord',
+      targetId: paymentId,
+      reason: `UPI payment claim submitted — ₹${amount} for bill ${bill.billNumber} (UTR: ${utr})`,
+    });
+
     showToast('Payment submitted for verification. Your bill will be updated once the admin verifies.');
     return paymentId;
   };
@@ -1220,7 +1289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actorId: user?.uid || 'admin',
       actorName: userProfile?.name || 'Admin',
       actorRole: role,
-      action: 'VERIFY_PAYMENT',
+      action: 'PAYMENT_VERIFIED',
       targetType: 'PaymentRecord',
       targetId: paymentId,
       reason: `Verified UPI payment of ₹${payment.amount} for bill ${payment.paymentReference}`,
@@ -1243,7 +1312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actorId: user?.uid || 'admin',
       actorName: userProfile?.name || 'Admin',
       actorRole: role,
-      action: 'REJECT_PAYMENT',
+      action: 'PAYMENT_REJECTED',
       targetType: 'PaymentRecord',
       targetId: paymentId,
       reason: `Rejected payment: ${reason}`,
@@ -1527,6 +1596,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         verifyPayment,
         rejectPayment,
         facilities,
+        facilityBookings,
         bookFacilitySlot,
         notices,
         createNotice,
@@ -1546,6 +1616,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPreviewMode,
         toastMessage,
         showToast,
+        notifications,
+        unreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
       }}
     >
       {children}
