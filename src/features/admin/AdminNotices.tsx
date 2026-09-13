@@ -99,7 +99,13 @@ export const AdminNotices: React.FC = () => {
 
       {/* Notices Cards */}
       <div className="space-y-3">
-        {notices.map((n) => (
+        {notices.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+            <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-700">No notices</p>
+            <p className="text-xs text-slate-400 mt-1">Publish your first notice to the community.</p>
+          </div>
+        ) : notices.map((n) => (
           <div
             key={n.id}
             className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3"

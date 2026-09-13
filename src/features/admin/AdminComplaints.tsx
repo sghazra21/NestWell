@@ -147,7 +147,15 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredComplaints.map((c) => (
+              {filteredComplaints.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-12 text-center">
+                    <Wrench className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-700">No complaints</p>
+                    <p className="text-xs text-slate-400 mt-1">No tickets match your current filters.</p>
+                  </td>
+                </tr>
+              ) : filteredComplaints.map((c) => (
                 <tr
                   key={c.id}
                   onClick={() => setInspectComplaint(c)}

@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { QrCodeView } from '../../components/common/QrCodeView';
 import { Modal } from '../../components/common/Modal';
 import { Visitor } from '../../types';
-import { ShieldCheck, Clock, User, QrCode, CheckCircle, Trash2, ArrowUpRight } from 'lucide-react';
+import { ShieldCheck, Clock, User, QrCode, CheckCircle, Trash2, ArrowUpRight, Wrench } from 'lucide-react';
 
 export const ResidentActivity: React.FC = () => {
   const { visitors, complaints, cancelVisitorPass, resident } = useApp();
@@ -129,7 +129,13 @@ export const ResidentActivity: React.FC = () => {
       {/* Complaints List */}
       {filterTab === 'complaints' && (
         <div className="space-y-3">
-          {residentComplaints.map((comp) => (
+          {residentComplaints.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+              <Wrench className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700">No complaints</p>
+              <p className="text-xs text-slate-400 mt-1">Report a problem from Home to get started.</p>
+            </div>
+          ) : residentComplaints.map((comp) => (
             <div
               key={comp.id}
               className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2.5"

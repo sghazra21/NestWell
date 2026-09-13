@@ -462,7 +462,15 @@ export const AdminPeople: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredResidents.map((r) => (
+                  {filteredResidents.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-5 py-12 text-center">
+                        <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-slate-700">No residents yet</p>
+                        <p className="text-xs text-slate-400 mt-1">Add residents using the button above to get started.</p>
+                      </td>
+                    </tr>
+                  ) : filteredResidents.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => setSelectedResident(r)}

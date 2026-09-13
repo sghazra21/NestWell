@@ -383,7 +383,15 @@ export const AdminFinance: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredBills.map((b) => (
+              {filteredBills.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-12 text-center">
+                    <CreditCard className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-700">No bills</p>
+                    <p className="text-xs text-slate-400 mt-1">Create and issue bills to residents from above.</p>
+                  </td>
+                </tr>
+              ) : filteredBills.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-5 py-4">
                     <span className="font-mono font-bold text-teal-800 bg-teal-50 px-2 py-1 rounded text-xs border border-teal-200/60">

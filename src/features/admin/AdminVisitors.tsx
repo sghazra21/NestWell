@@ -122,7 +122,15 @@ export const AdminVisitors: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredVisitors.map((v) => (
+              {filteredVisitors.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-12 text-center">
+                    <ShieldCheck className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-700">No visitors</p>
+                    <p className="text-xs text-slate-400 mt-1">No visitor passes match your current filters.</p>
+                  </td>
+                </tr>
+              ) : filteredVisitors.map((v) => (
                 <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-5 py-4">
                     <div className="font-bold text-slate-900">{v.name}</div>

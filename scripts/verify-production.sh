@@ -69,6 +69,24 @@ else
   pass "A6 src/mock/ removed"
 fi
 
+# A7: key modules have empty state handling
+EMPTY_STATE_MODULES=0
+for mod in AdminPeople AdminComplaints AdminFinance AdminVisitors AdminNotices ResidentNotices ResidentActivity; do
+  file=$(find src/ -name "${mod}.tsx" 2>/dev/null | head -1)
+  if [ -n "$file" ]; then
+    if grep -q "\.length === 0" "$file"; then
+      EMPTY_STATE_MODULES=$((EMPTY_STATE_MODULES + 1))
+    else
+      fail "A7 $mod missing empty state check"
+    fi
+  fi
+done
+if [ "$EMPTY_STATE_MODULES" -ge 6 ]; then
+  pass "A7 key modules have empty state handling ($EMPTY_STATE_MODULES modules)"
+else
+  fail "A7 only $EMPTY_STATE_MODULES key modules have empty state handling (expected >=6)"
+fi
+
 echo "=== B. Auth security tests ==="
 
 # B1: no hardcoded credentials

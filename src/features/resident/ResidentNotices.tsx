@@ -34,7 +34,13 @@ export const ResidentNotices: React.FC = () => {
 
       {/* Notices Feed */}
       <div className="space-y-3">
-        {notices.map((notice) => (
+        {notices.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+            <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-700">No notices</p>
+            <p className="text-xs text-slate-400 mt-1">Official circulars from your society will appear here.</p>
+          </div>
+        ) : notices.map((notice) => (
           <article
             key={notice.id}
             onClick={() => setSelectedNotice(notice)}
