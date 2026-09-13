@@ -23,15 +23,19 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
   onNavigate,
   onOpenComplaintDrawer,
 }) => {
-  const { complaints, visitors, bills, residents, currentSociety } = useApp();
+  const { complaints, visitors, bills, residents, flats, currentSociety } = useApp();
 
   const totalDuesPending = bills
     .filter((b) => b.status !== 'Paid')
-    .reduce((sum, b) => sum + b.amount, 0);
+    .reduce((sum, b) => sum + (b.totalAmount || 0), 0);
 
   const openComplaints = complaints.filter((c) => c.status !== 'resolved');
+  const urgentComplaints = openComplaints.filter((c) => c.priority === 'Urgent');
   const visitorsInside = visitors.filter((v) => v.status === 'inside').length;
   const overdueFlatsCount = bills.filter((b) => b.status === 'Overdue').length;
+  const occupiedFlats = flats.filter((f) => f.status === 'active').length;
+  const attentionComplaints = [...urgentComplaints, ...openComplaints.filter((c) => c.priority !== 'Urgent')].slice(0, 3);
+  const attentionBills = bills.filter((b) => b.status === 'Overdue').slice(0, 2);
 
   return (
     <div className="space-y-8">
@@ -65,10 +69,9 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-600 cursor-pointer transition-all"
         >
           <div className="text-sm font-medium text-slate-500 mb-2">Total Residents</div>
-          <div className="text-3xl font-bold text-slate-900">430</div>
-          <div className="mt-2 text-xs text-emerald-600 font-medium flex items-center gap-1">
-            <span>↑ 12 this month</span>
-            <span className="text-slate-400 font-normal">• 132 / 140 Flats</span>
+          <div className="text-3xl font-bold text-slate-900">{residents.length}</div>
+          <div className="mt-2 text-xs text-slate-400 font-medium flex items-center gap-1">
+            <span>{occupiedFlats} / {flats.length} flats occupied</span>
           </div>
         </div>
 
@@ -80,7 +83,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           <div className="text-sm font-medium text-slate-500 mb-2">Open Complaints</div>
           <div className="text-3xl font-bold text-orange-600">{openComplaints.length}</div>
           <div className="mt-2 text-xs text-slate-400 font-medium">
-            1 high priority • Avg SLA 3.2 hrs
+            {urgentComplaints.length} urgent
+            {openComplaints.length > 0 ? ` • ${openComplaints.filter((c) => !c.assignedTo).length} unassigned` : ''}
           </div>
         </div>
 
@@ -122,45 +126,55 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
         </div>
 
         <div className="divide-y divide-slate-50">
-          <div className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-            <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl shrink-0">
-              🔧
+          {attentionComplaints.length === 0 && attentionBills.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm font-semibold text-slate-700">All clear — nothing needs attention</p>
+              <p className="text-xs text-slate-400 mt-1">Urgent complaints and overdue bills will appear here.</p>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-slate-800">
-                Water leakage in C-Block Lobby & Main Drain
-              </div>
-              <div className="text-sm text-slate-500">
-                Reported by Rahul Sharma (C-104) • 2h ago • Urgent Priority
-              </div>
-            </div>
-            <button
-              onClick={() => onNavigate('complaints')}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
-            >
-              Assign Staff
-            </button>
-          </div>
-
-          <div className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-xl shrink-0">
-              💳
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-slate-800">
-                Verify Facility Booking Payment
-              </div>
-              <div className="text-sm text-slate-500">
-                Clubhouse booking by Amit Das (B-402) • ₹2,500 via UPI
-              </div>
-            </div>
-            <button
-              onClick={() => onNavigate('finance')}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
-            >
-              Review
-            </button>
-          </div>
+          ) : (
+            <>
+              {attentionComplaints.map((comp) => (
+                <div key={comp.id} className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                  <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl shrink-0">
+                    🔧
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800 truncate">{comp.title}</div>
+                    <div className="text-sm text-slate-500">
+                      {comp.residentName} ({comp.flat}) • {comp.priority} Priority
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onOpenComplaintDrawer(comp.id)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
+                  >
+                    Assign Staff
+                  </button>
+                </div>
+              ))}
+              {attentionBills.map((bill) => (
+                <div key={bill.id} className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                  <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-xl shrink-0">
+                    💳
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800">
+                      Overdue bill {bill.billNumber}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      {bill.residentName} ({bill.flat}) • ₹{bill.totalAmount.toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onNavigate('finance')}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
+                  >
+                    Review
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -182,7 +196,12 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           </div>
 
           <div className="space-y-3">
-            {complaints.slice(0, 3).map((comp) => (
+            {complaints.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">
+                No complaints yet. New tickets from residents will appear here.
+              </p>
+            ) : (
+              complaints.slice(0, 3).map((comp) => (
               <div
                 key={comp.id}
                 onClick={() => onOpenComplaintDrawer(comp.id)}
@@ -219,7 +238,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
                   {comp.status}
                 </span>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
 
@@ -239,7 +259,12 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
           </div>
 
           <div className="space-y-3">
-            {visitors.slice(0, 4).map((vis) => (
+            {visitors.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">
+                No visitor activity yet. Gate check-ins will stream here live.
+              </p>
+            ) : (
+              visitors.slice(0, 4).map((vis) => (
               <div
                 key={vis.id}
                 className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 flex items-center justify-between"
@@ -280,7 +305,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({
                   </span>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </div>

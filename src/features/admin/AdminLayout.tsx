@@ -24,7 +24,6 @@ import {
   LogOut,
   ChevronDown,
   ExternalLink,
-  Smartphone,
   Vote,
   Plus,
 } from 'lucide-react';
@@ -32,7 +31,8 @@ import {
 export const AdminLayout: React.FC = () => {
   const {
     role,
-    setRole,
+    userProfile,
+    currentMembership,
     complaints,
     visitors,
     bills,
@@ -104,20 +104,22 @@ export const AdminLayout: React.FC = () => {
 
         {/* Right User Info & Actions */}
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setRole('resident')}
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
-          >
-            <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Switch to Mobile</span>
-          </button>
-
           <div className="text-right hidden sm:block">
-            <div className="text-sm font-semibold text-slate-900">Col. Ramesh Nair</div>
-            <div className="text-xs text-slate-500 whitespace-nowrap">Admin Portal • Superuser</div>
+            <div className="text-sm font-semibold text-slate-900">
+              {userProfile?.name || currentMembership?.name || 'Society Admin'}
+            </div>
+            <div className="text-xs text-slate-500 whitespace-nowrap">
+              {currentSociety?.name || 'Admin Portal'}
+              {currentMembership?.designation ? ` • ${currentMembership.designation}` : ''}
+            </div>
           </div>
           <div className="w-10 h-10 bg-slate-200 rounded-full border-2 border-indigo-100 flex items-center justify-center font-bold text-indigo-700 text-sm shadow-xs">
-            RN
+            {(userProfile?.name || currentMembership?.name || 'A')
+              .split(' ')
+              .map((w) => w.charAt(0))
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()}
           </div>
         </div>
       </header>
@@ -171,7 +173,7 @@ export const AdminLayout: React.FC = () => {
           <div className="mt-4 p-4 bg-indigo-600 rounded-2xl text-white shadow-sm">
             <div className="text-xs opacity-80 mb-1">Today's Entry</div>
             <div className="text-xl font-bold">
-              {visitors.filter((v) => v.status === 'inside').length + 36} Visitors
+              {visitors.filter((v) => v.status === 'inside').length} Visitors
             </div>
             <button
               onClick={() => setActiveTab('visitors')}
