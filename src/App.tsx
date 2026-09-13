@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { RoleSwitcher } from './components/common/RoleSwitcher';
+
 import { ResidentApp } from './features/resident/ResidentApp';
 import { SecurityApp } from './features/security/SecurityApp';
 import { AdminLayout } from './features/admin/AdminLayout';
@@ -76,8 +76,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
-      <RoleSwitcher />
-
       {activeView === 'platform_admin' ? (
         <PlatformAdminDashboard />
       ) : needsOnboarding ? (
