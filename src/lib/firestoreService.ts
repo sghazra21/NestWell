@@ -48,6 +48,43 @@ const NOMINATIONS_COL = 'nominations';
 const VOTES_COL = 'votes';
 
 /**
+ * Recursively strip undefined properties from an object so Firestore setDoc / updateDoc never rejects.
+ * Uses JSON serialization + custom fallback to guarantee zero undefined properties.
+ */
+export function sanitizeFirestoreData<T extends Record<string, any>>(obj: T): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => (typeof item === 'object' && item !== null ? sanitizeFirestoreData(item) : item));
+  }
+  if (typeof obj !== 'object' || obj instanceof Date) {
+    return obj;
+  }
+
+  // Deep sanitization
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+        result[key] = sanitizeFirestoreData(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+
+  // Secondary guarantee: JSON parse/stringify drops any undefined keys that might have survived
+  try {
+    return JSON.parse(JSON.stringify(result));
+  } catch {
+    return result;
+  }
+}
+
+/**
  * Fetch existing profile or create a skeleton profile when a user logs in.
  */
 export async function syncUserProfile(
@@ -58,37 +95,88 @@ export async function syncUserProfile(
   const snap = await getDoc(userRef);
 
   if (snap.exists()) {
-    return snap.data() as UserProfile;
+    const data = snap.data() as UserProfile;
+    return sanitizeFirestoreData(data) as UserProfile;
   }
 
-  // Pre-fill fields from Google or email auth
-  const newProfile: UserProfile = {
+  // Pre-fill fields from Google or email auth without undefined fields
+  // New users always enter as verified residents linking flat; admins promote to higher roles.
+  const newProfile: Record<string, any> = {
     id: firebaseUser.uid,
     email: firebaseUser.email || '',
     name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Resident User'),
-    role: defaultRole,
+    role: 'resident',
     phone: firebaseUser.phoneNumber || '',
-    flat: defaultRole === 'resident' ? '' : undefined,
-    tower: defaultRole === 'resident' ? 'Tower B' : undefined,
     type: 'Owner',
     isProfileComplete: false, // Triggers mandatory profile completion UI
-    avatar: firebaseUser.photoURL || undefined,
     createdAt: new Date().toISOString(),
+    flat: '',
+    tower: 'Tower B',
   };
 
-  await setDoc(userRef, newProfile);
-  return newProfile;
+  if (firebaseUser.photoURL) {
+    newProfile.avatar = firebaseUser.photoURL;
+  }
+
+  const cleanProfile = sanitizeFirestoreData(newProfile);
+  await setDoc(userRef, cleanProfile);
+  return cleanProfile as UserProfile;
 }
 
 /**
- * Update user profile in Firestore (marks profile as complete)
+ * Update user profile in Firestore (marks profile as complete and removes undefined values)
  */
 export async function updateUserProfile(
   userId: string,
   data: Partial<UserProfile>
 ): Promise<void> {
   const userRef = doc(db, USERS_COL, userId);
-  await setDoc(userRef, { ...data, isProfileComplete: true }, { merge: true });
+  const cleanData = sanitizeFirestoreData({ ...data, isProfileComplete: true });
+
+  // Specifically ensure no undefined or unwanted gateNumber/badgeId for non-security roles
+  if (cleanData.role !== 'security' || !cleanData.gateNumber) {
+    delete cleanData.gateNumber;
+  }
+  if (cleanData.role !== 'security' || !cleanData.badgeId) {
+    delete cleanData.badgeId;
+  }
+
+  await setDoc(userRef, cleanData, { merge: true });
+}
+
+/**
+ * Update a user's role and designations (e.g. promoting someone to Society Admin)
+ */
+export async function updateUserRoleInFirestore(
+  userId: string,
+  role: UserProfile['role'],
+  designation?: string
+): Promise<void> {
+  const userRef = doc(db, USERS_COL, userId);
+  const payload: Record<string, any> = { role };
+  if (designation) {
+    payload.designation = designation;
+  }
+  const cleanPayload = sanitizeFirestoreData(payload);
+  await setDoc(userRef, cleanPayload, { merge: true });
+}
+
+/**
+ * Real-time listener for all registered users in the society
+ */
+export function subscribeUsers(callback: (users: UserProfile[]) => void) {
+  const q = query(collection(db, USERS_COL));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: UserProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as UserProfile);
+      });
+      callback(list);
+    },
+    (err) => console.warn('[Firestore] Users listener warning:', err)
+  );
 }
 
 /**
@@ -164,14 +252,14 @@ export function subscribeVisitors(callback: (visitors: Visitor[]) => void) {
 }
 
 export async function createFirestoreVisitor(visitor: Visitor): Promise<void> {
-  await setDoc(doc(db, VISITORS_COL, visitor.id), visitor);
+  await setDoc(doc(db, VISITORS_COL, visitor.id), sanitizeFirestoreData(visitor));
 }
 
 export async function updateFirestoreVisitorStatus(
   visitorId: string,
   updates: Partial<Visitor>
 ): Promise<void> {
-  await updateDoc(doc(db, VISITORS_COL, visitorId), updates);
+  await updateDoc(doc(db, VISITORS_COL, visitorId), sanitizeFirestoreData(updates));
 }
 
 // ----------------- COMPLAINTS -----------------
@@ -191,14 +279,14 @@ export function subscribeComplaints(callback: (complaints: Complaint[]) => void)
 }
 
 export async function createFirestoreComplaint(complaint: Complaint): Promise<void> {
-  await setDoc(doc(db, COMPLAINTS_COL, complaint.id), complaint);
+  await setDoc(doc(db, COMPLAINTS_COL, complaint.id), sanitizeFirestoreData(complaint));
 }
 
 export async function updateFirestoreComplaint(
   complaintId: string,
   updates: Partial<Complaint>
 ): Promise<void> {
-  await updateDoc(doc(db, COMPLAINTS_COL, complaintId), updates);
+  await updateDoc(doc(db, COMPLAINTS_COL, complaintId), sanitizeFirestoreData(updates));
 }
 
 // ----------------- BILLS -----------------
@@ -249,14 +337,14 @@ export function subscribeElections(callback: (elections: Election[]) => void) {
 }
 
 export async function createFirestoreElection(election: Election): Promise<void> {
-  await setDoc(doc(db, ELECTIONS_COL, election.id), election);
+  await setDoc(doc(db, ELECTIONS_COL, election.id), sanitizeFirestoreData(election));
 }
 
 export async function updateFirestoreElection(
   electionId: string,
   updates: Partial<Election>
 ): Promise<void> {
-  await updateDoc(doc(db, ELECTIONS_COL, electionId), updates);
+  await updateDoc(doc(db, ELECTIONS_COL, electionId), sanitizeFirestoreData(updates));
 }
 
 export function subscribeNominations(callback: (nominations: Nomination[]) => void) {
@@ -275,7 +363,7 @@ export function subscribeNominations(callback: (nominations: Nomination[]) => vo
 }
 
 export async function submitFirestoreNomination(nomination: Nomination): Promise<void> {
-  await setDoc(doc(db, NOMINATIONS_COL, nomination.id), nomination);
+  await setDoc(doc(db, NOMINATIONS_COL, nomination.id), sanitizeFirestoreData(nomination));
 }
 
 export async function updateFirestoreNominationStatus(
@@ -303,7 +391,7 @@ export function subscribeVotes(electionId: string, callback: (votes: Vote[]) => 
 export async function castFirestoreVote(vote: Vote): Promise<void> {
   const batch = writeBatch(db);
   // 1. Record vote document
-  batch.set(doc(db, VOTES_COL, vote.id), vote);
+  batch.set(doc(db, VOTES_COL, vote.id), sanitizeFirestoreData(vote));
 
   // 2. Increment candidate vote count
   const nomRef = doc(db, NOMINATIONS_COL, vote.candidateId);
@@ -333,5 +421,5 @@ export function subscribeNotices(callback: (notices: Notice[]) => void) {
 }
 
 export async function createFirestoreNotice(notice: Notice): Promise<void> {
-  await setDoc(doc(db, NOTICES_COL, notice.id), notice);
+  await setDoc(doc(db, NOTICES_COL, notice.id), sanitizeFirestoreData(notice));
 }

@@ -120,17 +120,20 @@ Ask the AI Studio assistant at any time to "deploy firestore rules", and the sys
 
 ### 2. Firebase Hosting (Pre-Configured with `firebase.json` & `.firebaserc`)
 
-Because `firebase.json` and `.firebaserc` are already configured for project `gen-lang-client-0898030963`, deploying to Firebase Hosting takes only 2 commands:
+Because `firebase.json` and `.firebaserc` are already configured for project `gen-lang-client-0898030963`, deploying to Firebase Hosting is straightforward:
 
 ```bash
-# 1. Build the production bundle into /dist
+# 1. Install firebase-tools globally if not already installed (recommended for WSL/Ubuntu)
+npm install -g firebase-tools
+
+# 2. In headless environments or WSL, use --no-localhost to log in via browser link:
+firebase login --no-localhost
+
+# 3. Build the production bundle
 npm run build
 
-# 2. Login to your Google account with access to the Firebase project
-npx firebase login
-
-# 3. Deploy hosting & rules to Firebase
-npx firebase deploy --only hosting
+# 4. Deploy to Firebase Hosting
+firebase deploy --only hosting
 ```
 
 Your live site will be immediately available at:
@@ -138,6 +141,34 @@ Your live site will be immediately available at:
 
 #### If using a custom domain on Firebase Hosting:
 1. Go to [Firebase Console > Hosting](https://console.firebase.google.com/project/gen-lang-client-0898030963/hosting)
+2. Click **Add Custom Domain** and follow the DNS TXT / A record verification.
+
+---
+
+## 7. Administrative Credentials & Society Admin Superpowers
+
+The application is structured as a true production product:
+
+### 1. Default Production Gate
+- Unauthenticated visitors are greeted by the official **Greenwood Heights Society Login Screen**.
+- No private society data, dues, or gate camera feeds are rendered without logging in.
+
+### 2. Local Super Admin Credentials
+For immediate full-access administrative onboarding without needing a pre-existing Firebase Auth account:
+- **Admin Email**: `admin@greenwood.in`
+- **Admin Password**: `AdminPassword@123`
+- **1-Click Quick Access**: Click the **"Local Super Admin (admin@greenwood.in)"** card at the bottom of the Login Screen.
+
+### 3. Promoting Any User to Society Admin
+As a Local Admin or Society Admin, you can empower any user or resident with full administrative authority:
+1. Go to the **Admin Portal** -> **Residents & Members** directory (`AdminPeople`).
+2. Under the **Society Flats & Residents** tab, click **"Make Admin"** on any flat owner or tenant, or open their resident drawer and select **"Promote to Society Admin"**.
+3. Under the **App Accounts & Admin Rights** tab, you will see all real users who have registered through Firebase Authentication (e.g. Google Sign-In or Email). Click **"Make Society Admin"** next to their account.
+4. Society Admins have complete administrative access across the entire app:
+   - Creating election cycles and verifying candidate portfolios.
+   - Managing maintenance dues, fee structures, and generating stamped GST tax receipts.
+   - Overriding gate security access and managing guard logs.
+   - Approving community hall and amenity bookings.
 2. Click **Add custom domain** (e.g. `society.yourdomain.com`).
 3. Follow the DNS verification steps provided by Firebase.
 

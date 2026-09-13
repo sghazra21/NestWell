@@ -8,11 +8,13 @@ import { AuthModal } from './components/auth/AuthModal';
 import { ProfileCompletionModal } from './components/auth/ProfileCompletionModal';
 import { SocietyElectionModal } from './features/election/SocietyElectionModal';
 import { IndianPaymentsResearchModal } from './components/payment/IndianPaymentsResearchModal';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { Wifi, Battery, Signal, CheckCircle, Info } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
     role,
+    userProfile,
     previewMode,
     isAuthModalOpen,
     setIsAuthModalOpen,
@@ -24,6 +26,25 @@ const AppContent: React.FC = () => {
     setIsPaymentsResearchOpen,
     toastMessage,
   } = useApp();
+
+  // Production Auth Gate: If no user session exists, display the official Society Login Screen
+  if (!userProfile) {
+    return (
+      <>
+        <LoginScreen />
+        {toastMessage && (
+          <div className="fixed bottom-5 right-5 z-50 animate-bounce max-w-md">
+            <div className="bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3">
+              <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-100 flex-1">{toastMessage}</p>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   const isMobileFrame = previewMode === 'mobile_frame';
 

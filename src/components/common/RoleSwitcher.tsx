@@ -13,6 +13,7 @@ import {
   User,
   LogOut,
   Sparkles,
+  Lock,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -31,6 +32,7 @@ export const RoleSwitcher: React.FC = () => {
     setPreviewMode,
     triggerGateSimulation,
     resetData,
+    showToast,
   } = useApp();
 
   const roles: { id: UserRole; label: string; icon: React.ReactNode; desc: string }[] = [
@@ -68,20 +70,32 @@ export const RoleSwitcher: React.FC = () => {
           <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 shadow-inner">
             {roles.map((r) => {
               const active = role === r.id;
+              const isAllowedAdmin = userProfile?.role === 'admin' || userProfile?.id === 'admin-local-master';
+              const isLocked = r.id === 'admin' && !isAllowedAdmin;
+
               return (
                 <button
                   key={r.id}
                   id={`role-btn-${r.id}`}
-                  onClick={() => setRole(r.id)}
-                  title={r.desc}
+                  onClick={() => {
+                    if (isLocked) {
+                      showToast('Administrative privileges required. Please contact a Society Admin.');
+                      return;
+                    }
+                    setRole(r.id);
+                  }}
+                  title={isLocked ? 'Restricted to designated Society Admins' : r.desc}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
                     active
                       ? 'bg-indigo-600 text-white shadow-sm font-semibold'
+                      : isLocked
+                      ? 'text-slate-500 hover:text-slate-400 opacity-60'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
                   {r.icon}
                   <span>{r.label}</span>
+                  {isLocked && <Lock className="w-3 h-3 text-amber-400/80 shrink-0" />}
                 </button>
               );
             })}
@@ -126,30 +140,35 @@ export const RoleSwitcher: React.FC = () => {
           </button>
 
           {/* Firebase Authentication & User Profile Button */}
-          {user ? (
-            <div className="flex items-center gap-1 bg-slate-800/90 pl-2 pr-1 py-1 rounded-xl border border-slate-700">
+          {userProfile ? (
+            <div className="flex items-center gap-1.5 bg-slate-800/90 pl-2 pr-1 py-1 rounded-xl border border-slate-700">
               <button
                 onClick={() => setIsProfileCompletionOpen(true)}
                 title="Edit verified society profile"
                 className="flex items-center gap-1.5 hover:text-indigo-300 text-left transition-colors"
               >
-                {user.photoURL ? (
+                {userProfile.avatar || user?.photoURL ? (
                   <img
-                    src={user.photoURL}
-                    alt={user.displayName || 'User'}
+                    src={userProfile.avatar || user?.photoURL || ''}
+                    alt={userProfile.name || 'User'}
                     className="w-5 h-5 rounded-full object-cover border border-slate-600"
                   />
                 ) : (
                   <User className="w-3.5 h-3.5 text-indigo-400" />
                 )}
-                <span className="font-bold max-w-[100px] truncate text-slate-200 text-[11px]">
-                  {user.displayName || user.email?.split('@')[0] || 'Member'}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-bold max-w-[120px] truncate text-slate-200 text-[11px] leading-tight">
+                    {userProfile.name || userProfile.email}
+                  </span>
+                  <span className="text-[9px] text-indigo-300 font-semibold leading-none">
+                    {userProfile.role === 'admin' ? '★ Society Admin' : userProfile.role === 'security' ? 'Guard' : 'Resident'}
+                  </span>
+                </div>
               </button>
               <button
                 onClick={logout}
-                title="Sign Out"
-                className="p-1 hover:text-red-400 text-slate-400 transition-colors"
+                title="Log out of Society Account"
+                className="p-1 hover:text-red-400 text-slate-400 transition-colors ml-1"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -161,7 +180,7 @@ export const RoleSwitcher: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-xs active:scale-95"
             >
               <User className="w-3.5 h-3.5" />
-              <span>Firebase Auth</span>
+              <span>Sign In</span>
             </button>
           )}
 

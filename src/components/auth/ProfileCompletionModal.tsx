@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { UserRole } from '../../types';
 import {
   Building,
   User,
@@ -8,9 +7,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Home,
-  Shield,
-  Briefcase,
-  Lock,
+  ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
 
@@ -27,22 +24,15 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
 
   const [name, setName] = useState(userProfile?.name || '');
   const [phone, setPhone] = useState(userProfile?.phone || '');
-  const [role, setRole] = useState<UserRole>(userProfile?.role || 'resident');
   const [tower, setTower] = useState(userProfile?.tower || 'Tower B');
   const [flat, setFlat] = useState(userProfile?.flat || '');
-  const [occupancyType, setOccupancyType] = useState<'Owner' | 'Tenant'>('Owner');
-  const [gateNumber, setGateNumber] = useState('Gate 1 - Main Gate');
-  const [badgeId, setBadgeId] = useState('');
-  const [designation, setDesignation] = useState('RWA Executive Member');
-  const [emergencyContact, setEmergencyContact] = useState('');
-  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [occupancyType, setOccupancyType] = useState<'Owner' | 'Tenant'>(userProfile?.type || 'Owner');
+  const [emergencyContact, setEmergencyContact] = useState(userProfile?.emergencyContact || '');
+  const [emergencyPhone, setEmergencyPhone] = useState(userProfile?.emergencyPhone || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   if (!isOpen || !userProfile) return null;
-
-  const hasPulledGoogleName = Boolean(userProfile.name && userProfile.name !== 'Resident User');
-  const hasPulledGoogleEmail = Boolean(userProfile.email);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,33 +43,38 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
       return;
     }
     if (!phone.trim()) {
-      setFormError('Please provide a mobile number for gate notifications.');
+      setFormError('Please provide a mobile number for gate entry notifications.');
       return;
     }
-
-    if (role === 'resident' && !flat.trim()) {
-      setFormError('Please select or specify your flat number (e.g. B-402).');
+    if (!flat.trim()) {
+      setFormError('Please provide your flat number (e.g. B-402, A-201).');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await completeUserProfile({
+      // Profile payload strictly for resident verification.
+      // Roles are solely assigned and elevated by Society Admins.
+      const profilePayload: Record<string, any> = {
         name: name.trim(),
         phone: phone.trim(),
-        role,
-        tower: role === 'resident' ? tower : undefined,
-        flat: role === 'resident' ? flat.trim().toUpperCase() : undefined,
-        type: role === 'resident' ? occupancyType : undefined,
-        gateNumber: role === 'security' ? gateNumber : undefined,
-        badgeId: role === 'security' ? badgeId.trim() || 'SEC-042' : undefined,
-        designation: role === 'admin' || role === 'committee' ? designation : undefined,
-        emergencyContact: emergencyContact.trim() || undefined,
-        emergencyPhone: emergencyPhone.trim() || undefined,
+        role: userProfile.role || 'resident',
+        tower,
+        flat: flat.trim().toUpperCase(),
+        type: occupancyType,
         isProfileComplete: true,
-      });
+      };
 
-      showToast('Profile verified and saved successfully!');
+      if (emergencyContact.trim()) {
+        profilePayload.emergencyContact = emergencyContact.trim();
+      }
+      if (emergencyPhone.trim()) {
+        profilePayload.emergencyPhone = emergencyPhone.trim();
+      }
+
+      await completeUserProfile(profilePayload);
+
+      showToast('Profile and flat verified successfully!');
       onClose();
     } catch (err: any) {
       console.error('Failed to complete profile:', err);
@@ -94,19 +89,19 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
       <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header banner */}
         <div className="bg-slate-900 text-white p-6 pb-5">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-2 border border-amber-500/30">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Mandatory Verification Step</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider mb-2 border border-indigo-500/30">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Apartment Flat Verification</span>
           </div>
           <h3 className="text-2xl font-extrabold tracking-tight">
             Complete Your Society Profile
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            Greenwood Heights bylaws require all residents and staff to link their verified flat and contact credentials.
+            Greenwood Heights bylaws require all residents to link their verified apartment unit and mobile contact for gate approvals and society billing.
           </p>
         </div>
 
-        {/* Data Pulled From Google Banner */}
+        {/* Data Pulled From Google/Firebase Banner */}
         <div className="bg-slate-50 border-b border-slate-200 p-4 space-y-2 text-xs">
           <span className="font-bold text-slate-600 block uppercase text-[10px] tracking-wider">
             Verified Authentication Data Pulled
@@ -139,46 +134,11 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
             </div>
           )}
 
-          {/* Role selector */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              1. Select Your Society Role *
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'resident', label: 'Resident', desc: 'Flat Owner/Tenant', icon: Home },
-                { id: 'admin', label: 'Admin / Committee', desc: 'RWA Management', icon: Briefcase },
-                { id: 'security', label: 'Security Guard', desc: 'Gate Staff', icon: Shield },
-              ].map((r) => {
-                const Icon = r.icon;
-                const isSelected = role === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setRole(r.id as UserRole)}
-                    className={`p-3 rounded-2xl border text-left transition-all ${
-                      isSelected
-                        ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600/20'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 mb-1.5 ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`} />
-                    <div className={`text-xs font-bold ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
-                      {r.label}
-                    </div>
-                    <div className="text-[10px] text-slate-500">{r.desc}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Full Name & Phone */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Full Name *
+                Full Legal Name *
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -195,7 +155,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
 
             <div>
               <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Phone (+91) *
+                Mobile (+91) *
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -211,127 +171,68 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
             </div>
           </div>
 
-          {/* Resident Details if resident */}
-          {role === 'resident' && (
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+          {/* Resident Flat Details */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
               <span className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                Apartment Flat Assignment
+                Apartment Flat Assignment *
               </span>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Tower
-                  </label>
-                  <select
-                    value={tower}
-                    onChange={(e) => setTower(e.target.value)}
-                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
-                  >
-                    <option value="Tower A">Tower A</option>
-                    <option value="Tower B">Tower B</option>
-                    <option value="Tower C">Tower C</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Flat No. *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. B-402"
-                    value={flat}
-                    onChange={(e) => setFlat(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600/30"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Occupancy
-                  </label>
-                  <select
-                    value={occupancyType}
-                    onChange={(e) => setOccupancyType(e.target.value as any)}
-                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
-                  >
-                    <option value="Owner">Owner</option>
-                    <option value="Tenant">Tenant</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Quick helper badge */}
-              <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                <span>Popular flats in demo: A-203, B-402, C-502, B-701</span>
-              </div>
+              <span className="text-[10px] text-slate-500 font-medium">
+                Verified Resident Access
+              </span>
             </div>
-          )}
 
-          {/* Security Guard Details */}
-          {role === 'security' && (
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <span className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                Security Post Assignment
-              </span>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Assigned Gate
-                  </label>
-                  <select
-                    value={gateNumber}
-                    onChange={(e) => setGateNumber(e.target.value)}
-                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
-                  >
-                    <option value="Gate 1 - Main Entrance">Gate 1 - Main Entrance</option>
-                    <option value="Gate 2 - North Gate">Gate 2 - North Gate</option>
-                    <option value="Gate 3 - Service Gate">Gate 3 - Service Gate</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Guard Badge ID
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="SEC-042"
-                    value={badgeId}
-                    onChange={(e) => setBadgeId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-mono font-bold text-slate-800"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Admin / Committee details */}
-          {(role === 'admin' || role === 'committee') && (
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <span className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                RWA Committee Portfolio
-              </span>
+            <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                  Designation / Position
+                  Tower / Wing
                 </label>
                 <select
-                  value={designation}
-                  onChange={(e) => setDesignation(e.target.value)}
+                  value={tower}
+                  onChange={(e) => setTower(e.target.value)}
                   className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
                 >
-                  <option value="RWA President">RWA President</option>
-                  <option value="General Secretary">General Secretary</option>
-                  <option value="Treasurer">Treasurer</option>
-                  <option value="Cultural Secretary">Cultural Secretary</option>
-                  <option value="Managing Committee Member">Managing Committee Member</option>
+                  <option value="Tower A">Tower A</option>
+                  <option value="Tower B">Tower B</option>
+                  <option value="Tower C">Tower C</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Flat No. *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. B-402"
+                  value={flat}
+                  onChange={(e) => setFlat(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Occupancy
+                </label>
+                <select
+                  value={occupancyType}
+                  onChange={(e) => setOccupancyType(e.target.value as any)}
+                  className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                >
+                  <option value="Owner">Owner</option>
+                  <option value="Tenant">Tenant</option>
                 </select>
               </div>
             </div>
-          )}
+
+            {/* Quick helper note */}
+            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+              <Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>Flats in society: A-101 to A-904, B-101 to B-904, C-101 to C-904</span>
+            </div>
+          </div>
 
           {/* Emergency Contact */}
           <div className="grid grid-cols-2 gap-3">
@@ -371,7 +272,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Save & Activate Society Access</span>
+                  <span>Save Flat & Activate Society Access</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

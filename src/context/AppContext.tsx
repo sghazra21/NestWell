@@ -44,6 +44,7 @@ import {
 import {
   syncUserProfile,
   updateUserProfile,
+  sanitizeFirestoreData,
   seedFirestoreInitialData,
   subscribeVisitors,
   createFirestoreVisitor,
@@ -63,6 +64,8 @@ import {
   castFirestoreVote,
   subscribeNotices,
   createFirestoreNotice,
+  subscribeUsers,
+  updateUserRoleInFirestore,
 } from '../lib/firestoreService';
 
 interface AppContextType {
@@ -79,6 +82,9 @@ interface AppContextType {
   isPaymentsResearchOpen: boolean;
   setIsPaymentsResearchOpen: (open: boolean) => void;
   loginWithDemoAccount: (role: UserRole) => void;
+  loginAsLocalAdmin: () => void;
+  promoteToSocietyAdmin: (targetIdentifier: string, newRole: UserRole, designation?: string) => Promise<void>;
+  registeredUsers: UserProfile[];
   completeUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
 
@@ -169,20 +175,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Auth state
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    return {
-      id: 'res-sayan-b402',
-      email: 'sayan.ghosh@greenwood.in',
-      name: 'Sayan Ghosh',
-      role: 'resident',
-      phone: '+91 98765 43210',
-      flat: 'B-402',
-      tower: 'Tower B',
-      type: 'Owner',
-      isProfileComplete: true,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString(),
-    };
+    const saved = localStorage.getItem('nestwell_user_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
   });
+  const [registeredUsers, setRegisteredUsers] = useState<UserProfile[]>([]);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
@@ -265,6 +268,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const setRole = (newRole: UserRole) => {
+    // Prevent non-admin users from self-promoting to admin
+    if (newRole === 'admin' && userProfile?.role !== 'admin' && userProfile?.id !== 'admin-local-master') {
+      showToast('Administrative privileges required. Contact a Society Admin.');
+      return;
+    }
     setRoleState(newRole);
     localStorage.setItem('nestwell_role', newRole);
     showToast(`Switched interface to ${newRole.charAt(0).toUpperCase() + newRole.slice(1)} view`);
@@ -280,10 +288,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUser(fbUser);
       if (fbUser) {
         try {
-          const profile = await syncUserProfile(fbUser, role);
+          // Regular users always register as resident; admins elevate privileges in Society Management
+          const profile = await syncUserProfile(fbUser, 'resident');
           setUserProfile(profile);
+          localStorage.setItem('nestwell_user_profile', JSON.stringify(profile));
           if (profile.role) {
             setRoleState(profile.role);
+            localStorage.setItem('nestwell_role', profile.role);
           }
           if (profile.flat) {
             setResident((prev) => ({
@@ -306,6 +317,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // 3. Setup real-time Firestore listeners
+    const unsubUsers = subscribeUsers((uList) => {
+      if (uList.length > 0) setRegisteredUsers(uList);
+    });
+
     const unsubVisitors = subscribeVisitors((vList) => {
       if (vList.length > 0) setVisitors(vList);
     });
@@ -336,6 +351,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => {
       unsubscribeAuth();
+      unsubUsers();
       unsubVisitors();
       unsubComplaints();
       unsubBills();
@@ -345,6 +361,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubNotices();
     };
   }, []);
+
+  // Local Admin Sign-In (Permanent Society Super Admin with Full Capabilities)
+  const loginAsLocalAdmin = () => {
+    const adminProfile: UserProfile = {
+      id: 'admin-alok-super',
+      email: 'admin@greenwood.in',
+      name: 'Dr. Alok Nath Mukherjee',
+      role: 'admin',
+      designation: 'RWA President & Society Admin',
+      phone: '+91 98311 88442',
+      flat: 'A-701',
+      tower: 'Tower A',
+      type: 'Owner',
+      isProfileComplete: true,
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString(),
+    };
+
+    setUserProfile(adminProfile);
+    localStorage.setItem('nestwell_user_profile', JSON.stringify(adminProfile));
+    setRoleState('admin');
+    localStorage.setItem('nestwell_role', 'admin');
+    showToast('Logged in as Local Super Admin (Dr. Alok Nath Mukherjee, Full Rights)');
+  };
+
+  // Promote any member or resident to Society Admin (or change role)
+  const promoteToSocietyAdmin = async (
+    targetIdentifier: string,
+    newRole: UserRole = 'admin',
+    designation: string = 'Society Admin & Executive Officer'
+  ) => {
+    // 1. Update residents array in state and localStorage
+    setResidents((prev) =>
+      prev.map((r) => {
+        if (
+          r.id === targetIdentifier ||
+          r.flat === targetIdentifier ||
+          r.email.toLowerCase() === targetIdentifier.toLowerCase()
+        ) {
+          return {
+            ...r,
+            societyRole: newRole,
+            designation,
+          };
+        }
+        return r;
+      })
+    );
+
+    // 2. Update in Firestore if registered user
+    try {
+      const match = registeredUsers.find(
+        (u) =>
+          u.id === targetIdentifier ||
+          u.email.toLowerCase() === targetIdentifier.toLowerCase() ||
+          u.flat === targetIdentifier
+      );
+      if (match?.id) {
+        await updateUserRoleInFirestore(match.id, newRole, designation);
+      }
+    } catch (err) {
+      console.warn('Could not sync user role to Firestore:', err);
+    }
+
+    // 3. If currently logged in user is being promoted, elevate their active session
+    if (
+      userProfile &&
+      (userProfile.id === targetIdentifier ||
+        userProfile.email.toLowerCase() === targetIdentifier.toLowerCase() ||
+        userProfile.flat === targetIdentifier)
+    ) {
+      const updatedProfile = {
+        ...userProfile,
+        role: newRole,
+        designation,
+      };
+      setUserProfile(updatedProfile);
+      setRoleState(newRole);
+      localStorage.setItem('nestwell_user_profile', JSON.stringify(updatedProfile));
+      localStorage.setItem('nestwell_role', newRole);
+    }
+
+    showToast(
+      `Role updated to ${newRole.toUpperCase()} (${designation}). Society admin rights activated!`
+    );
+  };
 
   // Quick Demo Account Switcher
   const loginWithDemoAccount = (targetRole: UserRole) => {
@@ -394,6 +496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setUserProfile(mockProfile);
+    localStorage.setItem('nestwell_user_profile', JSON.stringify(mockProfile));
     setRole(targetRole);
     if (mockProfile.flat) {
       setResident((prev) => ({
@@ -410,14 +513,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const completeUserProfileHandler = async (updates: Partial<UserProfile>) => {
     if (!userProfile) return;
-    const updated: UserProfile = {
-      ...userProfile,
-      ...updates,
+
+    // Deeply sanitize base and updates to eliminate any possible undefined properties
+    const cleanUpdates = sanitizeFirestoreData(updates);
+    const cleanBase = sanitizeFirestoreData(userProfile);
+
+    const updated: UserProfile = sanitizeFirestoreData({
+      ...cleanBase,
+      ...cleanUpdates,
       isProfileComplete: true,
-    };
+    });
+
+    // Strip gateNumber and badgeId for non-security roles
+    if (updated.role !== 'security') {
+      delete updated.gateNumber;
+      delete updated.badgeId;
+    }
+
     setUserProfile(updated);
+    localStorage.setItem('nestwell_user_profile', JSON.stringify(updated));
     if (updated.role) {
       setRoleState(updated.role);
+      localStorage.setItem('nestwell_role', updated.role);
     }
     if (updated.flat) {
       setResident((prev) => ({
@@ -428,7 +545,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: updated.phone || prev.phone,
       }));
     }
-    // Update in Firestore
+    // Update in Firestore safely
     if (user?.uid) {
       await updateUserProfile(user.uid, updated);
     }
@@ -438,11 +555,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
-      setUser(null);
-      showToast('Logged out of society account.');
     } catch (e) {
       console.warn('Logout error:', e);
     }
+    setUser(null);
+    setUserProfile(null);
+    localStorage.removeItem('nestwell_user_profile');
+    showToast('Logged out of society account.');
   };
 
   // Persist whenever state changes
@@ -1039,6 +1158,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isPaymentsResearchOpen,
         setIsPaymentsResearchOpen,
         loginWithDemoAccount,
+        loginAsLocalAdmin,
+        promoteToSocietyAdmin,
+        registeredUsers,
         completeUserProfile: completeUserProfileHandler,
         logout,
         society,

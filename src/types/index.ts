@@ -46,6 +46,8 @@ export interface ResidentProfile {
   vehicles: { number: string; type: 'Car' | 'Two-Wheeler'; slot: string }[];
   dues: number;
   avatar?: string;
+  societyRole?: UserRole;
+  designation?: string;
 }
 
 export type Resident = ResidentProfile;
