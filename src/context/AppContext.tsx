@@ -24,6 +24,7 @@ import {
   Tower,
   Flat,
   SocietyMember,
+  Vehicle,
   PlatformUser,
   PlatformAnalytics,
   SupportSession,
@@ -540,8 +541,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Derive residents list from real flats and member records.
   const residents: ResidentProfile[] = flats.map((f) => {
     const occupant = members.find(
-      (m) => m.flatId === f.id && (m.role === 'resident' || m.role === 'society_admin')
+      (m) =>
+        (m.flatId && m.flatId === f.id) ||
+        (m.flatNumber &&
+          m.flatNumber.toUpperCase() === f.number.toUpperCase() &&
+          (!m.towerName || !f.towerName || m.towerName === f.towerName)) ||
+        (f.primaryResidentName && m.name === f.primaryResidentName)
     );
+    const memberVehicles = occupant?.vehicles || [];
+    const flatVehicles = (f.vehicles || []).map((v) => ({
+      number: v.number,
+      type: v.type as Vehicle['type'],
+      ownerName: occupant?.name || f.primaryResidentName || '',
+      slot: v.slot,
+    }));
+    const seen = new Set(flatVehicles.map((v) => v.number.toUpperCase()));
+    const vehicles = [
+      ...flatVehicles,
+      ...memberVehicles
+        .filter((v) => !seen.has((v.number || '').toUpperCase()))
+        .map((v) => ({ number: v.number || '', type: v.type, ownerName: v.ownerName || occupant?.name || '', slot: v.slot || '' })),
+    ];
     return {
       id: f.id,
       name: occupant?.name || f.primaryResidentName || f.ownerNames?.[0] || '',
@@ -549,10 +569,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tower: f.towerName || '',
       phone: occupant?.phone || f.primaryResidentPhone || '',
       email: occupant?.email || '',
-      type: 'Owner',
-      status: occupant ? 'Active' : 'Pending Verification',
-      familyMembers: [],
-      vehicles: f.vehicles || [],
+      type: occupant?.type || 'Owner',
+      status: occupant || f.status === 'active' ? 'Active' : 'Pending Verification',
+      familyMembers: occupant?.familyMembers || [],
+      vehicles,
       dues: f.dues || 0,
     };
   });
@@ -730,15 +750,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setUserProfile(updated);
 
+    // Resolve the selected flat so the membership links to a real flat record.
+    const flatNo = (updated.flat || '').trim().toUpperCase();
+    const towerName = (updated.tower || '').trim();
+    const flatMatch = flats.find(
+      (f) =>
+        f.number.toUpperCase() === flatNo &&
+        (!towerName || f.towerName === towerName || f.towerId === towerName)
+    );
+
     await createOrUpdateMemberRecord(currentSocietyId, {
       uid: user.uid,
       email: updated.email,
       name: updated.name,
       phone: updated.phone,
+      flatId: flatMatch?.id || '',
       flatNumber: updated.flat,
       towerName: updated.tower,
+      type: updated.type,
       profileComplete: true,
+      familyMembers: updated.familyMembers || [],
+      vehicles: updated.vehicles || [],
     });
+
+    // Mark the flat occupied and record ownership/tenancy.
+    if (flatMatch) {
+      const isOwner = (updated.type || 'Owner') === 'Owner';
+      const existing = isOwner ? flatMatch.ownerIds || [] : flatMatch.tenantIds || [];
+      const ids = existing.includes(user.uid) ? existing : [...existing, user.uid];
+      await updateFlatRecord(currentSocietyId, flatMatch.id, {
+        status: 'active',
+        ...(isOwner ? { ownerIds: ids } : { tenantIds: ids }),
+        primaryResidentName: updated.name,
+        primaryResidentPhone: updated.phone,
+      });
+    }
 
     setIsProfileCompletionOpen(false);
     showToast('Profile completed and saved to Firestore.');

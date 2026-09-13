@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { FamilyMember, Vehicle, VehicleType } from '../../types';
 import {
   Building,
   User,
@@ -20,7 +21,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { userProfile, completeUserProfile, showToast, towers, flats } = useApp();
+  const { userProfile, completeUserProfile, showToast, towers, flats, members } = useApp();
 
   const [name, setName] = useState(userProfile?.name || '');
   const [phone, setPhone] = useState(userProfile?.phone || '');
@@ -29,10 +30,21 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
   const [occupancyType, setOccupancyType] = useState<'Owner' | 'Tenant'>(userProfile?.type || 'Owner');
   const [emergencyContact, setEmergencyContact] = useState(userProfile?.emergencyContact || '');
   const [emergencyPhone, setEmergencyPhone] = useState(userProfile?.emergencyPhone || '');
+  const [family, setFamily] = useState<FamilyMember[]>(userProfile?.familyMembers || []);
+  const [vehicles, setVehicles] = useState<Vehicle[]>(userProfile?.vehicles || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   if (!isOpen || !userProfile) return null;
+
+  const RELATIONS = ['Spouse', 'Son', 'Daughter', 'Father', 'Mother', 'Brother', 'Sister', 'Father-in-Law', 'Mother-in-Law', 'Domestic Help', 'Tenant', 'Other'];
+  const VEHICLE_TYPES: VehicleType[] = ['Car', 'Two-Wheeler', 'EV', 'Bicycle'];
+  const regRequired = (t: VehicleType) => t === 'Car' || t === 'Two-Wheeler';
+
+  // Vehicle owner must be the user, a listed family member, or a society member.
+  const knownNames = new Set(
+    [name.trim().toLowerCase(), ...family.map((f) => f.name.trim().toLowerCase()), ...members.map((m) => m.name.trim().toLowerCase())].filter(Boolean)
+  );
 
   const towerFlats = tower
     ? flats.filter((f) => f.towerName === tower || f.towerId === tower)
@@ -54,6 +66,20 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
       setFormError('Please select your flat from the list.');
       return;
     }
+    for (const v of vehicles) {
+      if (regRequired(v.type) && !v.number.trim()) {
+        setFormError(`Registration number is required for ${v.type}.`);
+        return;
+      }
+      if (!v.ownerName.trim()) {
+        setFormError('Each vehicle needs an owner name.');
+        return;
+      }
+      if (!knownNames.has(v.ownerName.trim().toLowerCase())) {
+        setFormError(`Vehicle owner "${v.ownerName}" must be you, a listed family member, or a society resident.`);
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -66,6 +92,13 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
         tower,
         flat: flat.trim().toUpperCase(),
         type: occupancyType,
+        familyMembers: family.filter((f) => f.name.trim()).map((f) => ({ name: f.name.trim(), relation: f.relation })),
+        vehicles: vehicles.map((v) => ({
+          number: v.number.trim().toUpperCase(),
+          type: v.type,
+          ownerName: v.ownerName.trim(),
+          slot: (v.slot || '').trim(),
+        })),
         isProfileComplete: true,
       };
 
@@ -253,6 +286,108 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                       : 'No flats configured in this society yet.'}
               </span>
             </div>
+          </div>
+
+          {/* Family Members */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                Family Members
+              </span>
+              <button
+                type="button"
+                onClick={() => setFamily((prev) => [...prev, { name: '', relation: 'Spouse' }])}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+              >
+                + Add member
+              </button>
+            </div>
+            {family.length === 0 ? (
+              <p className="text-[11px] text-slate-400">No family members added. Optional.</p>
+            ) : (
+              family.map((f, i) => (
+                <div key={i} className="grid grid-cols-5 gap-2">
+                  <input
+                    value={f.name}
+                    onChange={(e) => setFamily((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    placeholder="Full name"
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs col-span-3 outline-none focus:ring-2 focus:ring-indigo-600/30"
+                  />
+                  <select
+                    value={f.relation}
+                    onChange={(e) => setFamily((prev) => prev.map((x, j) => (j === i ? { ...x, relation: e.target.value } : x)))}
+                    className="h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold col-span-1"
+                  >
+                    {RELATIONS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setFamily((prev) => prev.filter((_, j) => j !== i))}
+                    className="h-10 rounded-xl border border-slate-200 text-slate-400 hover:text-red-600 text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Vehicles */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                Vehicles & Parking
+              </span>
+              <button
+                type="button"
+                onClick={() => setVehicles((prev) => [...prev, { number: '', type: 'Car' as VehicleType, ownerName: name, slot: '' }])}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+              >
+                + Add vehicle
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              Registration number required for cars & two-wheelers. EV & bicycle need no number.
+              Owner must be you, a listed family member, or a society resident.
+            </p>
+            {vehicles.length === 0 ? (
+              <p className="text-[11px] text-slate-400">No vehicles added. Optional.</p>
+            ) : (
+              vehicles.map((v, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2">
+                  <select
+                    value={v.type}
+                    onChange={(e) => setVehicles((prev) => prev.map((x, j) => (j === i ? { ...x, type: e.target.value as VehicleType } : x)))}
+                    className="h-10 px-1 rounded-xl border border-slate-200 bg-white text-xs font-semibold col-span-3"
+                  >
+                    {VEHICLE_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={v.number}
+                    onChange={(e) => setVehicles((prev) => prev.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))}
+                    placeholder={regRequired(v.type) ? 'Reg no. *' : 'Reg no. (optional)'}
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs col-span-3 outline-none focus:ring-2 focus:ring-indigo-600/30"
+                  />
+                  <input
+                    value={v.ownerName}
+                    onChange={(e) => setVehicles((prev) => prev.map((x, j) => (j === i ? { ...x, ownerName: e.target.value } : x)))}
+                    placeholder="Owner name *"
+                    className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs col-span-4 outline-none focus:ring-2 focus:ring-indigo-600/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVehicles((prev) => prev.filter((_, j) => j !== i))}
+                    className="h-10 rounded-xl border border-slate-200 text-slate-400 hover:text-red-600 text-sm font-bold col-span-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Emergency Contact */}

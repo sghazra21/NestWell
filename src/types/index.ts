@@ -2,6 +2,7 @@ export * from './society';
 export * from './flat';
 export * from './membership';
 export * from './platform';
+import { FamilyMember, Vehicle } from './membership';
 
 export type UserRole = 'resident' | 'security' | 'admin' | 'committee' | 'platform_admin';
 
@@ -25,6 +26,8 @@ export interface UserProfile {
   emergencyPhone?: string;
   societyId?: string;
   platformRole?: 'platform_admin' | null;
+  familyMembers?: FamilyMember[];
+  vehicles?: Vehicle[];
   createdAt: string;
 }
 
@@ -51,8 +54,8 @@ export interface ResidentProfile {
   status: 'Active' | 'Pending Verification';
   moveInDate?: string;
   occupancyDate?: string;
-  familyMembers: { name: string; relation: string; phone?: string }[];
-  vehicles: { number: string; type: 'Car' | 'Two-Wheeler'; slot: string }[];
+  familyMembers: FamilyMember[];
+  vehicles: Vehicle[];
   dues: number;
   avatar?: string;
   societyRole?: UserRole;
