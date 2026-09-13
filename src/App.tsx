@@ -62,21 +62,7 @@ const AppContent: React.FC = () => {
 
   // Suspended societies are blocked from normal operation.
   if (currentSociety?.status === 'suspended' && activeView !== 'platform_admin') {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center mx-auto">
-            <span className="text-2xl">⛔</span>
-          </div>
-          <h1 className="text-lg font-extrabold text-slate-900">
-            {currentSociety.name} is suspended
-          </h1>
-          <p className="text-sm text-slate-500">
-            This society is currently suspended. Please contact NestWell support.
-          </p>
-        </div>
-      </div>
-    );
+    return <SuspendedGate />;
   }
 
   const isMobileFrame = previewMode === 'mobile_frame';
@@ -188,6 +174,47 @@ const PickerGate: React.FC = () => {
     return <JoinSociety onBack={() => setJoining(false)} onJoined={() => setJoining(false)} />;
   }
   return <SocietyPicker onJoin={() => setJoining(true)} />;
+};
+
+const SuspendedGate: React.FC = () => {
+  const { currentSociety, isPlatformAdmin, setActiveView, setCurrentSocietyId, logout } = useApp();
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center mx-auto">
+          <span className="text-2xl">⛔</span>
+        </div>
+        <h1 className="text-lg font-extrabold text-slate-900">
+          {currentSociety?.name || 'This society'} is suspended
+        </h1>
+        <p className="text-sm text-slate-500">
+          This society is currently suspended. Please contact NestWell support.
+        </p>
+        <div className="flex flex-col gap-2 pt-2">
+          {isPlatformAdmin && (
+            <button
+              onClick={() => setActiveView('platform_admin')}
+              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+            >
+              Open Platform Console
+            </button>
+          )}
+          <button
+            onClick={() => setCurrentSocietyId('')}
+            className="w-full h-11 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
+          >
+            Back to my societies
+          </button>
+          <button
+            onClick={logout}
+            className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-1"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default function App() {
