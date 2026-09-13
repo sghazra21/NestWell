@@ -32,6 +32,7 @@ export const AdminPeople: React.FC = () => {
     userProfile,
     currentSociety,
     members,
+    towers,
     setMemberStatus,
     inviteMember,
     showToast,
@@ -40,7 +41,7 @@ export const AdminPeople: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'residents' | 'app_accounts' | 'invites'>('residents');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'All' | 'Owner' | 'Tenant'>('All');
-  const [towerFilter, setTowerFilter] = useState<'All' | 'Tower A' | 'Tower B'>('All');
+  const [towerFilter, setTowerFilter] = useState<string>('All');
 
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -51,7 +52,7 @@ export const AdminPeople: React.FC = () => {
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newType, setNewType] = useState<'Owner' | 'Tenant'>('Owner');
-  const [newTower, setNewTower] = useState<'Tower A' | 'Tower B'>('Tower B');
+  const [newTower, setNewTower] = useState<string>('');
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('');
@@ -140,7 +141,8 @@ export const AdminPeople: React.FC = () => {
             Resident & Member Directory
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registered owners, tenants, and staff across Tower A & Tower B
+            Registered owners, tenants, and staff
+            {towers.length > 0 ? ` across ${towers.map((t) => t.name).join(' & ')}` : ''}
           </p>
         </div>
 
@@ -269,7 +271,7 @@ export const AdminPeople: React.FC = () => {
                           </span>
                         </div>
                         <div className="text-xs text-slate-500">
-                          {usr.email} {usr.flat ? `• Flat ${usr.flat} (${usr.tower || 'Tower B'})` : ''}
+                          {usr.email} {usr.flat ? `• Flat ${usr.flat}${usr.tower ? ` (${usr.tower})` : ''}` : ''}
                         </div>
                       </div>
                     </div>
@@ -433,12 +435,13 @@ export const AdminPeople: React.FC = () => {
               {/* Tower Filter */}
               <select
                 value={towerFilter}
-                onChange={(e) => setTowerFilter(e.target.value as any)}
+                onChange={(e) => setTowerFilter(e.target.value)}
                 className="h-11 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-700"
               >
                 <option value="All">All Towers</option>
-                <option value="Tower A">Tower A</option>
-                <option value="Tower B">Tower B</option>
+                {towers.map((t) => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -748,11 +751,13 @@ export const AdminPeople: React.FC = () => {
               </label>
               <select
                 value={newTower}
-                onChange={(e) => setNewTower(e.target.value as any)}
+                onChange={(e) => setNewTower(e.target.value)}
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-700"
               >
-                <option value="Tower A">Tower A</option>
-                <option value="Tower B">Tower B</option>
+                <option value="">Select tower…</option>
+                {towers.map((t) => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
               </select>
             </div>
           </div>

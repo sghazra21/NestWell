@@ -20,11 +20,11 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { userProfile, completeUserProfile, showToast } = useApp();
+  const { userProfile, completeUserProfile, showToast, towers, flats } = useApp();
 
   const [name, setName] = useState(userProfile?.name || '');
   const [phone, setPhone] = useState(userProfile?.phone || '');
-  const [tower, setTower] = useState(userProfile?.tower || 'Tower B');
+  const [tower, setTower] = useState(userProfile?.tower || '');
   const [flat, setFlat] = useState(userProfile?.flat || '');
   const [occupancyType, setOccupancyType] = useState<'Owner' | 'Tenant'>(userProfile?.type || 'Owner');
   const [emergencyContact, setEmergencyContact] = useState(userProfile?.emergencyContact || '');
@@ -33,6 +33,10 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
 
   if (!isOpen || !userProfile) return null;
+
+  const towerFlats = tower
+    ? flats.filter((f) => f.towerName === tower || f.towerId === tower)
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +51,7 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
       return;
     }
     if (!flat.trim()) {
-      setFormError('Please provide your flat number (e.g. B-402, A-201).');
+      setFormError('Please select your flat from the list.');
       return;
     }
 
@@ -189,12 +193,16 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                 </label>
                 <select
                   value={tower}
-                  onChange={(e) => setTower(e.target.value)}
+                  onChange={(e) => {
+                    setTower(e.target.value);
+                    setFlat('');
+                  }}
                   className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
                 >
-                  <option value="Tower A">Tower A</option>
-                  <option value="Tower B">Tower B</option>
-                  <option value="Tower C">Tower C</option>
+                  <option value="">Select tower…</option>
+                  {towers.map((t) => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
                 </select>
               </div>
 
@@ -202,14 +210,19 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
                   Flat No. *
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. B-402"
+                <select
                   value={flat}
                   onChange={(e) => setFlat(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600/30"
-                />
+                  disabled={!tower || towerFlats.length === 0}
+                  className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-600/30 disabled:opacity-60"
+                >
+                  <option value="">
+                    {!tower ? 'Select tower first…' : towerFlats.length === 0 ? 'No flats in this tower…' : 'Select flat…'}
+                  </option>
+                  {towerFlats.map((f) => (
+                    <option key={f.id} value={f.number}>{f.number}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -230,7 +243,15 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
             {/* Quick helper note */}
             <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
               <Building className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-              <span>Flats in society: A-101 to A-904, B-101 to B-904, C-101 to C-904</span>
+              <span>
+                {towerFlats.length > 0
+                  ? `${towerFlats.length} flat(s) in ${tower}`
+                  : tower
+                    ? `No flats configured in ${tower} yet — ask your Society Admin.`
+                    : flats.length > 0
+                      ? `${flats.length} flat(s) in society — pick a tower first.`
+                      : 'No flats configured in this society yet.'}
+              </span>
             </div>
           </div>
 

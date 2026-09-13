@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { NoticePriority } from '../../types';
+import { NoticePriority, Notice } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles } from 'lucide-react';
 
 export const AdminNotices: React.FC = () => {
-  const { notices, publishNotice, userProfile, currentSociety } = useApp();
+  const { notices, publishNotice, userProfile, currentSociety, towers } = useApp();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [category, setCategory] = useState<'maintenance' | 'event' | 'security' | 'general'>('maintenance');
   const [priority, setPriority] = useState<NoticePriority>('normal');
-  const [audience, setAudience] = useState<'All Residents' | 'Tower A Only' | 'Tower B Only' | 'Owners Only'>('All Residents');
+  const [audience, setAudience] = useState<string>('All Residents');
   const [time, setTime] = useState('10:00 AM – 02:00 PM');
 
   const handlePublish = (e: React.FormEvent) => {
@@ -24,8 +24,8 @@ export const AdminNotices: React.FC = () => {
       message,
       category,
       priority,
-      audience,
-      targetBlock: audience.includes('Tower') ? audience.replace(' Only', '') : undefined,
+      audience: audience as Notice['audience'],
+      targetBlock: audience.endsWith(' Only') ? audience.replace(/ Only$/, '') : undefined,
       publishedBy: userProfile?.name || currentSociety?.name || 'Society Administration',
       date: 'Today',
       time,
@@ -137,9 +137,10 @@ export const AdminNotices: React.FC = () => {
                 onChange={(e) => setAudience(e.target.value as any)}
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-teal-700"
               >
-                <option value="All Residents">All Residents (Tower A & B)</option>
-                <option value="Tower A Only">Tower A Only</option>
-                <option value="Tower B Only">Tower B Only</option>
+                <option value="All Residents">All Residents{towers.length > 0 ? ` (${towers.map((t) => t.name).join(' & ')})` : ''}</option>
+                {towers.map((t) => (
+                  <option key={t.id} value={`${t.name} Only`}>{t.name} Only</option>
+                ))}
                 <option value="Owners Only">Flat Owners Only</option>
               </select>
             </div>
