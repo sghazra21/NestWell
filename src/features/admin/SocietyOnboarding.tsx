@@ -43,7 +43,43 @@ export const SocietyOnboarding: React.FC = () => {
   const [flatFloors, setFlatFloors] = useState('');
   const [flatUnitsPerFloor, setFlatUnitsPerFloor] = useState('4');
   const [flatUnitStart, setFlatUnitStart] = useState('1');
+  const [flatAlphaStart, setFlatAlphaStart] = useState('A');
+  const [flatPattern, setFlatPattern] = useState('{prefix}-{floor}{unit:02}');
   const [flatType, setFlatType] = useState<FlatType>('2BHK');
+
+  const FLAT_PRESETS: { label: string; example: string; pattern: string }[] = [
+    { label: 'Tower-Unit (A-101)', example: 'A-101, A-102…', pattern: '{prefix}-{floor}{unit:02}' },
+    { label: 'Floor+Letter (1A)', example: '1A, 1B, 1C…', pattern: '{floor}{unitAlpha}' },
+    { label: 'Number (103)', example: '103, 104, 105…', pattern: '{floor}{unit:02}' },
+    { label: 'Unit only (G1)', example: 'G1, G2… with prefix G', pattern: '{prefix}{unit}' },
+  ];
+
+  // Alphabetic unit labels: A, B, … Z, AA, AB… starting from a given letter.
+  const alphaAt = (startLetter: string, index: number): string => {
+    const base = Math.max(0, Math.min(25, startLetter.toUpperCase().charCodeAt(0) - 65));
+    let n = base + index;
+    let s = '';
+    do {
+      s = String.fromCharCode(65 + (n % 26)) + s;
+      n = Math.floor(n / 26) - 1;
+    } while (n >= 0);
+    return s;
+  };
+
+  const renderFlatNumber = (
+    pattern: string,
+    prefix: string,
+    floor: number,
+    unit: number,
+    unitAlpha: string
+  ): string => {
+    return pattern
+      .replace(/\{prefix\}/g, prefix)
+      .replace(/\{floor\}/g, String(floor))
+      .replace(/\{unit:(\d+)\}/g, (_m, w) => String(unit).padStart(parseInt(w, 10), '0'))
+      .replace(/\{unit\}/g, String(unit))
+      .replace(/\{unitAlpha\}/g, unitAlpha);
+  };
 
   // Facility form
   const [facName, setFacName] = useState('');
@@ -89,14 +125,19 @@ export const SocietyOnboarding: React.FC = () => {
       .map((f) => parseInt(f.trim(), 10))
       .filter((n) => !isNaN(n) && n > 0);
     const perFloor = Math.max(1, parseInt(flatUnitsPerFloor, 10) || 1);
-    const unitStart = Math.max(1, parseInt(flatUnitStart, 10) || 1);
+    const unitStart = Math.max(0, parseInt(flatUnitStart, 10) || 0);
     if (floors.length === 0) {
       setError('Enter at least one floor number (e.g. 1,2,3).');
+      return;
+    }
+    if (!/\{(floor|unit|unitAlpha)(:\d+)?\}/.test(flatPattern)) {
+      setError('Numbering pattern must include {floor}, {unit} or {unitAlpha} — otherwise every flat gets the same number.');
       return;
     }
     setBusy(true);
     setError(null);
     try {
+      const prefix = flatPrefix.trim() || tower.code;
       // Existing numbers in this tower (never silently overwrite another batch).
       const existing = new Set(
         flats.filter((f) => f.towerId === tower.id).map((f) => f.number.toUpperCase())
@@ -105,8 +146,13 @@ export const SocietyOnboarding: React.FC = () => {
       let skipped = 0;
       for (const floor of floors) {
         for (let i = 0; i < perFloor; i++) {
-          const unit = String(unitStart + i).padStart(2, '0');
-          const number = `${flatPrefix || tower.code}-${floor}${unit}`;
+          const number = renderFlatNumber(
+            flatPattern,
+            prefix,
+            floor,
+            unitStart + i,
+            alphaAt(flatAlphaStart, i)
+          );
           if (existing.has(number.toUpperCase())) {
             skipped += 1;
             continue;
@@ -128,7 +174,7 @@ export const SocietyOnboarding: React.FC = () => {
       showToast(
         created > 0
           ? `${created} ${flatType} flat(s) created in ${tower.name}${skipped > 0 ? ` (${skipped} already existed, skipped)` : ''}.`
-          : `All ${skipped} flat number(s) already exist — change the unit start number.`
+          : `All ${skipped} flat number(s) already exist — adjust the pattern or start values.`
       );
       setFlatFloors('');
     } catch (err: any) {
@@ -281,8 +327,7 @@ export const SocietyOnboarding: React.FC = () => {
             <h2 className="font-bold text-slate-900">Step 2 — Flats</h2>
             <p className="text-xs text-slate-500">
               {flats.length} flat(s) configured. Flats start as <strong>vacant</strong> until members are assigned.
-              For mixed layouts, run one batch per type with a different unit start
-              (e.g. 2BHK units 01–04, then 3BHK units 05–08).
+              Pick a numbering style that matches the society — run one batch per flat type for mixed layouts.
             </p>
             <form onSubmit={handleBulkFlats} className="space-y-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -298,12 +343,46 @@ export const SocietyOnboarding: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Numbering style</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {FLAT_PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => setFlatPattern(p.pattern)}
+                      title={p.example}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                        flatPattern === p.pattern
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input value={flatPattern} onChange={(e) => setFlatPattern(e.target.value)} placeholder="Pattern: {prefix}-{floor}{unit:02}" spellCheck={false} className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-mono" />
                 <input value={flatPrefix} onChange={(e) => setFlatPrefix(e.target.value)} placeholder="Prefix (default: tower code)" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                 <input value={flatFloors} onChange={(e) => setFlatFloors(e.target.value)} placeholder="Floors: 1,2,3" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
                 <input value={flatUnitsPerFloor} onChange={(e) => setFlatUnitsPerFloor(e.target.value)} placeholder="Units/floor" inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
                 <input value={flatUnitStart} onChange={(e) => setFlatUnitStart(e.target.value)} placeholder="Unit start no." inputMode="numeric" className="h-10 px-3 rounded-xl border border-slate-200 text-sm" />
+                <input value={flatAlphaStart} onChange={(e) => setFlatAlphaStart(e.target.value.slice(0, 1))} placeholder="Start letter (A)" maxLength={1} className="h-10 px-3 rounded-xl border border-slate-200 text-sm uppercase" />
               </div>
+              <FlatNumberPreview
+                pattern={flatPattern}
+                prefix={flatPrefix.trim() || towers.find((t) => t.id === flatTowerId)?.code || 'A'}
+                floors={flatFloors}
+                perFloor={parseInt(flatUnitsPerFloor, 10) || 0}
+                unitStart={parseInt(flatUnitStart, 10) || 0}
+                alphaStart={flatAlphaStart || 'A'}
+                render={renderFlatNumber}
+                alphaAt={alphaAt}
+              />
               <button disabled={busy} className="w-full h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1">
                 <Plus className="w-3.5 h-3.5" /> Create flats
               </button>
@@ -393,6 +472,45 @@ export const SocietyOnboarding: React.FC = () => {
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+// Live preview of the numbers a bulk batch will generate.
+const FlatNumberPreview: React.FC<{
+  pattern: string;
+  prefix: string;
+  floors: string;
+  perFloor: number;
+  unitStart: number;
+  alphaStart: string;
+  render: (pattern: string, prefix: string, floor: number, unit: number, unitAlpha: string) => string;
+  alphaAt: (startLetter: string, index: number) => string;
+}> = ({ pattern, prefix, floors, perFloor, unitStart, alphaStart, render, alphaAt }) => {
+  const firstFloors = floors
+    .split(',')
+    .map((f) => parseInt(f.trim(), 10))
+    .filter((n) => !isNaN(n) && n > 0)
+    .slice(0, 2);
+  if (firstFloors.length === 0 || perFloor <= 0) return null;
+  const samples: string[] = [];
+  for (const floor of firstFloors) {
+    for (let i = 0; i < Math.min(perFloor, 4); i++) {
+      samples.push(render(pattern, prefix, floor, unitStart + i, alphaAt(alphaStart, i)));
+      if (samples.length >= 6) break;
+    }
+    if (samples.length >= 6) break;
+  }
+  const unique = new Set(samples);
+  return (
+    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+      <span className="font-bold text-slate-500 uppercase tracking-wider">Preview: </span>
+      <span className="font-mono">{samples.join(', ')}{perFloor * firstFloors.length > samples.length ? ', …' : ''}</span>
+      {unique.size < samples.length && (
+        <span className="block mt-1 font-semibold text-amber-700">
+          Warning: pattern generates duplicate numbers — adjust the pattern or start values.
+        </span>
+      )}
     </div>
   );
 };
