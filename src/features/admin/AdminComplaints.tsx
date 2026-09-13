@@ -23,7 +23,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
   selectedTicketId,
   onClearSelectedTicket,
 }) => {
-  const { complaints, updateComplaintStatus, assignComplaintStaff } = useApp();
+  const { complaints, updateComplaintStatus, assignComplaint } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'reported' | 'assigned' | 'started' | 'resolved'>('all');
@@ -63,7 +63,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
 
   const handleAssign = (staff: { name: string; role: string; phone: string }) => {
     if (!inspectComplaint) return;
-    assignComplaintStaff(inspectComplaint.id, staff);
+    assignComplaint(inspectComplaint.id, staff);
     setInspectComplaint((prev) =>
       prev ? { ...prev, assignedTo: staff, status: 'assigned' } : null
     );
