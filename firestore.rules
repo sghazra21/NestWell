@@ -46,8 +46,12 @@ service cloud.firestore {
     }
 
     // Active membership in a usable society (operational access).
+    // Platform admins are included so a newly created society (which has
+    // no members yet) can be bootstrapped: towers, flats and the first
+    // admin invitation cannot be created without read access.
     function isSocietyMember(societyId) {
-      return hasActiveMembership(societyId) && societyIsUsable(societyId);
+      return isPlatformAdmin()
+        || (hasActiveMembership(societyId) && societyIsUsable(societyId));
     }
 
     function societyRole(societyId) {

@@ -87,6 +87,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 /**
+ * Log-only variant for real-time subscription error callbacks.
+ * Subscriptions must never throw: permission-denied simply means the
+ * listener yields no data (logged out, non-member, suspended tenant).
+ */
+export function logFirestoreWarning(error: unknown, operationType: OperationType, path: string | null) {
+  const code = (error as { code?: string })?.code || 'unknown';
+  console.warn(`[Firestore] ${operationType} ${path || ''}: ${code}`);
+}
+
+/**
  * Deeply sanitizes any object to prevent undefined values in Firestore writes.
  */
 export function sanitizeFirestoreData<T extends Record<string, any>>(obj: T): any {
@@ -167,7 +177,7 @@ export function subscribePlatformUser(uid: string, callback: (user: PlatformUser
         callback(null);
       }
     },
-    (error) => handleFirestoreError(error, OperationType.GET, path)
+    (error) => logFirestoreWarning(error, OperationType.GET, path)
   );
 }
 
@@ -199,7 +209,7 @@ export function subscribeSocieties(callback: (societies: Society[]) => void) {
       snapshot.forEach((d) => list.push(d.data() as Society));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -214,7 +224,7 @@ export function subscribeSociety(societyId: string, callback: (society: Society 
         callback(null);
       }
     },
-    (error) => handleFirestoreError(error, OperationType.GET, path)
+    (error) => logFirestoreWarning(error, OperationType.GET, path)
   );
 }
 
@@ -281,7 +291,7 @@ export function subscribeTowers(societyId: string, callback: (towers: Tower[]) =
       snapshot.forEach((d) => list.push(d.data() as Tower));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -314,7 +324,7 @@ export function subscribeFlats(societyId: string, callback: (flats: Flat[]) => v
       snapshot.forEach((d) => list.push(d.data() as Flat));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -361,7 +371,7 @@ export function subscribeMembers(societyId: string, callback: (members: SocietyM
       snapshot.forEach((d) => list.push(d.data() as SocietyMember));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -376,7 +386,7 @@ export function subscribeMember(societyId: string, uid: string, callback: (membe
         callback(null);
       }
     },
-    (error) => handleFirestoreError(error, OperationType.GET, path)
+    (error) => logFirestoreWarning(error, OperationType.GET, path)
   );
 }
 
@@ -687,7 +697,7 @@ export function subscribeVisitors(societyId: string, callback: (visitors: Visito
       snapshot.forEach((d) => list.push(d.data() as Visitor));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -738,7 +748,7 @@ export function subscribeComplaints(societyId: string, callback: (complaints: Co
       snapshot.forEach((d) => list.push(d.data() as Complaint));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -793,7 +803,7 @@ export function subscribeBills(societyId: string, callback: (bills: MaintenanceB
       snapshot.forEach((d) => list.push(d.data() as MaintenanceBill));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -871,7 +881,7 @@ export function subscribeFacilities(societyId: string, callback: (facilities: Fa
       snapshot.forEach((d) => list.push(d.data() as Facility));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -901,7 +911,7 @@ export function subscribeFacilityBookings(societyId: string, callback: (bookings
       snapshot.forEach((d) => list.push(d.data() as FacilityBooking));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -941,7 +951,7 @@ export function subscribeNotices(societyId: string, callback: (notices: Notice[]
       snapshot.forEach((d) => list.push(d.data() as Notice));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -977,7 +987,7 @@ export function subscribeElections(societyId: string, callback: (elections: Elec
       snapshot.forEach((d) => list.push(d.data() as Election));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -1010,7 +1020,7 @@ export function subscribeNominations(societyId: string, electionId: string, call
       snapshot.forEach((d) => list.push(d.data() as Nomination));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -1048,7 +1058,7 @@ export function subscribeVotes(societyId: string, electionId: string, callback: 
       snapshot.forEach((d) => list.push(d.data() as Vote));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -1104,7 +1114,7 @@ export function subscribeAuditLogs(societyId: string, callback: (logs: AuditLog[
       list.sort((a, b) => (a.timestamp > b.timestamp ? -1 : 1));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -1141,7 +1151,7 @@ export function subscribePlatformAnalytics(callback: (analytics: PlatformAnalyti
       snapshot.forEach((d) => list.push(d.data() as PlatformAnalytics));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 
@@ -1154,7 +1164,7 @@ export function subscribeSupportSessions(callback: (sessions: SupportSession[]) 
       snapshot.forEach((d) => list.push(d.data() as SupportSession));
       callback(list);
     },
-    (error) => handleFirestoreError(error, OperationType.LIST, path)
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
 }
 

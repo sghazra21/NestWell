@@ -338,12 +338,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    // Subscribe to platform-wide societies list
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // -------------------------------------------------------------
+  // 1b. PLATFORM SUBSCRIPTIONS (signed-in users only)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!user) {
+      setSocieties([]);
+      setPlatformAnalytics([]);
+      setSupportSessions([]);
+      return;
+    }
+
+    // Societies directory (rules filter to visible statuses for non-admins).
+    // No auto-select: the user picks a society explicitly via SocietyPicker.
     const unsubSocieties = subscribeSocieties((socList) => {
       setSocieties(socList);
-      if (socList.length > 0 && !socList.find((s) => s.id === currentSocietyId)) {
-        setCurrentSocietyIdState(socList[0].id);
-      }
     });
 
     const unsubPlatformAnalytics = subscribePlatformAnalytics((aList) => {
@@ -355,12 +369,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     return () => {
-      unsubscribeAuth();
       unsubSocieties();
       unsubPlatformAnalytics();
       unsubSupportSessions();
     };
-  }, []);
+  }, [user?.uid]);
 
   // -------------------------------------------------------------
   // 2. TENANT-ISOLATED REAL-TIME SUBSCRIPTIONS
