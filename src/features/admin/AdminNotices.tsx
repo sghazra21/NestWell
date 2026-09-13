@@ -5,7 +5,7 @@ import { Modal } from '../../components/common/Modal';
 import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles } from 'lucide-react';
 
 export const AdminNotices: React.FC = () => {
-  const { notices, publishNotice, userProfile, currentSociety, towers } = useApp();
+  const { notices, createNotice, userProfile, currentSociety, towers } = useApp();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -19,16 +19,12 @@ export const AdminNotices: React.FC = () => {
     e.preventDefault();
     if (!title || !message) return;
 
-    publishNotice({
+    createNotice({
       title,
       message,
-      category,
       priority,
       audience: audience as Notice['audience'],
       targetBlock: audience.endsWith(' Only') ? audience.replace(/ Only$/, '') : undefined,
-      publishedBy: userProfile?.name || currentSociety?.name || 'Society Administration',
-      date: 'Today',
-      time,
       attachmentName: 'Official_Notice.pdf',
     });
 
