@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../../components/common/Modal';
 import { Visitor, VisitorType } from '../../types';
+import { NestWellLogo } from '../../components/branding/NestWellLogo';
 import { Html5Qrcode } from 'html5-qrcode';
 import {
   Shield,
@@ -157,12 +158,10 @@ export const SecurityApp: React.FC = () => {
       <header className="bg-slate-900 text-white p-4 sticky top-10 z-30 shadow-sm border-b border-slate-800">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-xs">
-              <Shield className="w-5 h-5" />
-            </div>
+            <NestWellLogo variant="icon" className="w-10 h-10 rounded-xl bg-white p-1.5 shadow-xs shrink-0" />
             <div>
               <h1 className="text-lg font-bold tracking-tight">{currentSociety?.gates?.[0]?.name || 'Security Gate'}</h1>
-              <p className="text-xs text-slate-400">On-Duty Guard</p>
+              <p className="text-xs text-slate-400">On-Duty Guard &bull; Powered by NestWell</p>
             </div>
           </div>
 

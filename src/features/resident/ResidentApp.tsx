@@ -74,7 +74,7 @@ export const ResidentApp: React.FC = () => {
         {activeTab === 'activity' && <ResidentActivity />}
         {activeTab === 'notices' && <ResidentNotices />}
         {activeTab === 'receipts' && <ResidentReceipts />}
-        {activeTab === 'more' && <ResidentMore />}
+        {activeTab === 'more' && <ResidentMore onNavigateToTab={(tab) => setActiveTab(tab)} />}
       </main>
 
       {/* Floating Alert Trigger if visitor is waiting at gate and user is on another tab */}

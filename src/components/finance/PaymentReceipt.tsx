@@ -1,5 +1,6 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
+import { NestWellLogo } from '../branding/NestWellLogo';
 
 export interface PaymentReceiptData {
   societyName: string;
@@ -167,9 +168,10 @@ export const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ data }) => {
           <p className="text-[10px] text-slate-400">
             Generated: {new Date().toLocaleString()}
           </p>
-          <p className="text-[10px] text-slate-500 font-medium pt-2">
-            This is a system-generated receipt. For queries contact your society admin.
-          </p>
+          <div className="flex items-center justify-center gap-1.5 pt-2 border-t border-slate-100">
+            <NestWellLogo variant="icon" className="w-3.5 h-3.5 rounded" />
+            <span className="text-[10px] font-bold text-slate-500">Authenticated by NestWell Smart Society Platform</span>
+          </div>
         </div>
       </div>
     </>

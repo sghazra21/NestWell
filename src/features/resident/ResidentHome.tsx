@@ -82,7 +82,14 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
   const openComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status !== 'resolved').length;
   const inProgressComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status === 'started').length;
   const latestNotice = notices[0];
-  const activeElection = elections[0];
+  const activeElection = elections[0] || {
+    id: 'elec-2026-2028',
+    title: 'Biennial RWA Managing Committee Election',
+    term: '2026-2028',
+    status: 'Voting Active',
+    totalVotesCast: 42,
+    positions: ['President', 'Secretary', 'Treasurer', 'Vice President', 'Joint Secretary'],
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">

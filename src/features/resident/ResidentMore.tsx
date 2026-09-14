@@ -18,9 +18,14 @@ import {
   UserCheck,
   Building,
   MessageCircle,
+  Receipt as ReceiptIcon,
 } from 'lucide-react';
 
-export const ResidentMore: React.FC = () => {
+interface ResidentMoreProps {
+  onNavigateToTab?: (tab: 'home' | 'activity' | 'notices' | 'receipts' | 'more') => void;
+}
+
+export const ResidentMore: React.FC<ResidentMoreProps> = ({ onNavigateToTab }) => {
   const {
     resident,
     currentSociety,
@@ -53,6 +58,17 @@ export const ResidentMore: React.FC = () => {
     {
       title: 'Governance & Payments',
       items: [
+        {
+          id: 'receipts',
+          label: 'Payment Receipts & Tax Invoices',
+          sub: 'Download and print verified maintenance receipts & audited invoices',
+          icon: <ReceiptIcon className="w-5 h-5 text-emerald-600" />,
+          action: () => {
+            if (onNavigateToTab) {
+              onNavigateToTab('receipts');
+            }
+          },
+        },
         {
           id: 'election',
           label: 'Society Committee & Elections',
