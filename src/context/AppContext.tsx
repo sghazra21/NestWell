@@ -2075,8 +2075,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const flatId = flat?.id || resident.flatId || '';
 
     if (!flatId) {
-      showToast('Could not determine your flat. Please update your profile.');
-      return;
+      throw new Error('Could not determine your flat. Please update your profile.');
     }
 
     // Generate a ballot hash for secrecy (HMAC-like: electionId + flatId + position, truncated)
