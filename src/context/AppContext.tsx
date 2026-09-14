@@ -599,6 +599,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Expenses
     const unsubExpenses = subscribeExpenseRecords(currentSocietyId, (expList) => setExpenses(expList));
 
+    // Receipts (resident-scoped via flatId filter)
+    let unsubReceipts: (() => void) | null = null;
+    if (residentFlatIdRef.current) {
+      unsubReceipts = subscribeResidentReceipts(currentSocietyId, residentFlatIdRef.current, (rList) => setReceipts(rList));
+    }
+
     return () => {
       unsubSoc();
       unsubTowers();
@@ -618,6 +624,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubAudit();
       unsubTreasury();
       unsubExpenses();
+      unsubReceipts?.();
     };
   }, [currentSocietyId, user?.uid, selectedElectionId]);
 
@@ -1633,6 +1640,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     }).catch(() => {});
 
+    // Create receipt record
+    const bill = bills.find((b) => b.id === payment.billId);
+    if (bill) {
+      createReceiptRecordInDb(currentSocietyId, {
+        societyId: currentSocietyId,
+        billId: payment.billId,
+        paymentId: payment.id,
+        flatId: payment.flatId,
+        flatNumber: payment.flatNumber,
+        residentName: payment.residentId,
+        receiptNumber: `RCP-${Date.now().toString(36).toUpperCase()}`,
+        billNumber: bill.billNumber,
+        billingPeriod: bill.billingPeriod || `${bill.month} ${bill.year}`,
+        amount: payment.amount,
+        paymentMethod: payment.paymentMethod,
+        paymentReference: payment.paymentReference,
+        utr: payment.utr,
+        status: 'VERIFIED',
+        paidAt: payment.submittedAt,
+        verifiedAt: new Date().toISOString(),
+        verifiedBy: user?.uid || '',
+        createdAt: new Date().toISOString(),
+      }).catch((err) => console.warn('Receipt creation error:', err));
+    }
+
     showToast('Payment verified and bill marked as Paid.');
   };
 
@@ -1709,6 +1741,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           createdBy: user?.uid || 'admin',
         }).catch((err) => console.warn('Treasury entry error:', err));
       }
+    }
+
+    // Create receipt record for manual payment
+    const paidBill = bills.find((b) => b.id === billId);
+    if (paidBill) {
+      createReceiptRecordInDb(currentSocietyId, {
+        societyId: currentSocietyId,
+        billId,
+        paymentId: transactionId,
+        flatId: paidBill.flatId || '',
+        flatNumber: paidBill.flat,
+        residentName: paidBill.residentName,
+        receiptNumber: `RCP-${Date.now().toString(36).toUpperCase()}`,
+        billNumber: paidBill.billNumber,
+        billingPeriod: paidBill.billingPeriod || `${paidBill.month} ${paidBill.year}`,
+        amount: paidBill.totalAmount,
+        paymentMethod: method,
+        paymentReference: paidBill.billNumber,
+        status: 'CONFIRMED',
+        paidAt: new Date().toISOString(),
+        verifiedBy: user?.uid || 'admin',
+        createdAt: new Date().toISOString(),
+      }).catch((err) => console.warn('Receipt creation error:', err));
     }
 
     showToast('Offline payment recorded.');
@@ -2174,6 +2229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         totalExpensesThisMonth,
         createExpense,
         cancelExpense,
+        receipts,
       }}
     >
       {children}

@@ -142,32 +142,35 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
     }
   };
 
-  const handleNominationSubmit = (e: React.FormEvent) => {
+  const handleNominationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nomForm.manifesto.trim() || !nomForm.profession.trim()) {
       showToast('Please provide your profession and manifesto.');
       return;
     }
 
-    submitNomination({
-      electionId: currentElection.id,
-      position: nomForm.position,
-      candidateId: resident.id,
-      candidateName: nomForm.candidateName,
-      flat: nomForm.flat,
-      tower: nomForm.tower,
-      phone: resident.phone,
-      email: resident.email,
-      profession: nomForm.profession,
-      yearsInSociety: Number(nomForm.yearsInSociety),
-      manifesto: nomForm.manifesto,
-    });
-
-    showToast('Your candidate nomination has been submitted for scrutiny!');
-    setActiveTab('ballot');
+    try {
+      await submitNomination({
+        electionId: currentElection.id,
+        position: nomForm.position,
+        candidateId: resident.id,
+        candidateName: nomForm.candidateName,
+        flat: nomForm.flat,
+        tower: nomForm.tower,
+        phone: resident.phone,
+        email: resident.email,
+        profession: nomForm.profession,
+        yearsInSociety: Number(nomForm.yearsInSociety),
+        manifesto: nomForm.manifesto,
+      });
+      showToast('Your candidate nomination has been submitted for scrutiny!');
+      setActiveTab('ballot');
+    } catch (error: any) {
+      showToast('Failed to submit nomination: ' + (error.message || 'Unknown error'));
+    }
   };
 
-  const handleCreateElection = (e: React.FormEvent) => {
+  const handleCreateElection = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -188,27 +191,30 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
       return;
     }
 
-    createElection({
-      title: scheduleForm.title,
-      term: scheduleForm.term,
-      description: scheduleForm.description,
-      positions: [
-        'President',
-        'General Secretary',
-        'Treasurer',
-        'Cultural Secretary',
-        'Maintenance & Facilities Head',
-        'Security Committee Head',
-      ],
-      nominationStart: scheduleForm.nominationStart,
-      nominationEnd: scheduleForm.nominationEnd,
-      votingStart: scheduleForm.votingStart,
-      votingEnd: scheduleForm.votingEnd,
-      status: 'Draft',
-      eligibleVotersCount: flats.length || 0,
-    });
-
-    showToast('New election scheduled successfully!');
+    try {
+      await createElection({
+        title: scheduleForm.title,
+        term: scheduleForm.term,
+        description: scheduleForm.description,
+        positions: [
+          'President',
+          'General Secretary',
+          'Treasurer',
+          'Cultural Secretary',
+          'Maintenance & Facilities Head',
+          'Security Committee Head',
+        ],
+        nominationStart: scheduleForm.nominationStart,
+        nominationEnd: scheduleForm.nominationEnd,
+        votingStart: scheduleForm.votingStart,
+        votingEnd: scheduleForm.votingEnd,
+        status: 'Draft',
+        eligibleVotersCount: flats.length || 0,
+      });
+      showToast('New election scheduled successfully!');
+    } catch (error: any) {
+      showToast('Failed to create election: ' + (error.message || 'Unknown error'));
+    }
   };
 
   return (
