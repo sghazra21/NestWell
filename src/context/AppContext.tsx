@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
+import { doc, updateDoc } from 'firebase/firestore';
 import {
   UserRole,
   UserProfile,
@@ -34,6 +35,7 @@ import {
 } from '../types';
 import {
   auth,
+  db,
   onAuthStateChanged,
   firebaseSignOut,
   FirebaseUser,
@@ -447,6 +449,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // -------------------------------------------------------------
   const residentFlatRef = useRef(resident.flat);
   residentFlatRef.current = resident.flat;
+  const residentFlatIdRef = useRef(resident.flatId || '');
+  residentFlatIdRef.current = resident.flatId || '';
   const roleRef = useRef(role);
   roleRef.current = role;
 
@@ -489,7 +493,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Bills
     const unsubBills = subscribeBills(currentSocietyId, (bList) => {
       setBills(bList);
-      const myDue = bList.find((b) => b.flat === residentFlatRef.current && b.status !== 'Paid');
+      const myDue = bList.find((b) => {
+        const matchByFlatId = residentFlatIdRef.current && b.flatId
+          ? b.flatId === residentFlatIdRef.current
+          : b.flat?.trim().toUpperCase() === residentFlatRef.current?.trim().toUpperCase();
+        return matchByFlatId && b.status !== 'Paid';
+      });
       if (myDue) {
         setResident((prev) => ({ ...prev, dues: myDue.totalAmount }));
       } else if (bList.length > 0) {
@@ -554,6 +563,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentSocietyId, user?.uid]);
 
   // -------------------------------------------------------------
+  // 2c. BACKFILL: Add flatId to existing bills missing it
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (bills.length > 0 && flats.length > 0 && currentSocietyId) {
+      const billsNeedingFlatId = bills.filter(b => !b.flatId && b.flat);
+      for (const bill of billsNeedingFlatId) {
+        const matchingFlat = flats.find(f => f.number?.trim().toUpperCase() === bill.flat?.trim().toUpperCase());
+        if (matchingFlat) {
+          updateDoc(doc(db, 'societies', currentSocietyId, 'bills', bill.id), { flatId: matchingFlat.id }).catch(() => {});
+        }
+      }
+    }
+  }, [bills, flats, currentSocietyId]);
+
+  // -------------------------------------------------------------
   // 2b. ROLE DERIVATION (membership is authoritative)
   // Role is derived from the user's membership in the current society.
   // It is never set manually, never read from localStorage.
@@ -594,6 +618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: currentMembership.email || user?.email || prev.email,
         phone: currentMembership.phone || user?.phoneNumber || prev.phone,
         flat: currentMembership.flatNumber || prev.flat || (flats.length > 0 ? flats[0].number : 'A-101'),
+        flatId: currentMembership.flatId || prev.flatId,
         tower: currentMembership.towerName || prev.tower || (towers.length > 0 ? towers[0].name : 'Tower A'),
         type: currentMembership.type || prev.type || 'Owner',
         status: 'Active',
@@ -1429,6 +1454,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const billingPeriod = `${month} ${year}`;
     const newBill = await createBillRecord(currentSocietyId, {
       societyId: currentSocietyId,
+      flatId: flatId,
       flat: flatNumber,
       tower: towerName,
       residentName,

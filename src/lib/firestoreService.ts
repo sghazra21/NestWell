@@ -705,6 +705,23 @@ export async function acceptSocietyInvite(
   const batch = writeBatch(db);
   const now = new Date().toISOString();
   const memberRef = doc(db, 'societies', invite.societyId, 'members', fbUser.uid);
+
+  // Look up flat to populate flatNumber and towerName
+  let flatNumber = '';
+  let towerName = '';
+  if (invite.flatId) {
+    try {
+      const flatDoc = await getDoc(doc(db, 'societies', invite.societyId, 'flats', invite.flatId));
+      if (flatDoc.exists()) {
+        const flatData = flatDoc.data() as Flat;
+        flatNumber = flatData.number;
+        towerName = flatData.towerName || flatData.towerId || '';
+      }
+    } catch {
+      // flat lookup failed, continue with empty
+    }
+  }
+
   batch.set(
     memberRef,
     sanitizeFirestoreData({
@@ -718,8 +735,8 @@ export async function acceptSocietyInvite(
       role: invite.intendedRole,
       status: 'active',
       flatId: invite.flatId || '',
-      flatNumber: '',
-      towerName: '',
+      flatNumber: flatNumber,
+      towerName: towerName,
       type: 'Owner',
       profileComplete: false,
       invitedBy: invite.createdBy,

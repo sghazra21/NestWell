@@ -85,6 +85,7 @@ export interface ResidentProfile {
   id: string;
   name: string;
   flat: string;
+  flatId?: string;
   tower: string;
   phone: string;
   email: string;
@@ -176,6 +177,7 @@ export interface BillLineItem {
 export interface MaintenanceBill {
   id: string;
   societyId?: string;
+  flatId?: string;
   billNumber: string;
   flat: string;
   tower: string;

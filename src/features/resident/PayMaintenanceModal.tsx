@@ -37,8 +37,14 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
     showToast,
   } = useApp();
 
-  const activeBill = bills.find((b) => b.flat === resident.flat && b.status !== 'Paid');
-  const hasAnyBills = bills.some((b) => b.flat === resident.flat);
+  const activeBill = bills.find((b) => {
+    if (resident.flatId && b.flatId) return b.flatId === resident.flatId && b.status !== 'Paid';
+    return b.flat?.trim().toUpperCase() === resident.flat?.trim().toUpperCase() && b.status !== 'Paid';
+  });
+  const hasAnyBills = bills.some((b) => {
+    if (resident.flatId && b.flatId) return b.flatId === resident.flatId;
+    return b.flat?.trim().toUpperCase() === resident.flat?.trim().toUpperCase();
+  });
 
   // Find the most recent payment claim for the active bill
   const myPaymentClaim = activeBill
