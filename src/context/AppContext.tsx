@@ -510,6 +510,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   residentFlatIdRef.current = resident.flatId || '';
   const roleRef = useRef(role);
   roleRef.current = role;
+  const receiptsBackfillRef = useRef(false);
 
   useEffect(() => {
     if (!currentSocietyId) return;
@@ -665,6 +666,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
   }, [bills, flats, currentSocietyId, canAccessAdminView]);
+
+  // -------------------------------------------------------------
+  // 2d. BACKFILL: Create receipts for all past VERIFIED payments missing one
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!currentSocietyId || !user || bills.length === 0 || payments.length === 0) return;
+    if (receiptsBackfillRef.current) return;
+    receiptsBackfillRef.current = true;
+
+    const verifiedPayments = payments.filter(
+      (p) => p.status === 'VERIFIED' || (p as any).status === 'confirmed'
+    );
+
+    for (const payment of verifiedPayments) {
+      const existingReceipt = receipts.find((r) => r.paymentId === payment.id);
+      if (existingReceipt) continue;
+
+      const bill = bills.find((b) => b.id === payment.billId);
+      if (!bill) continue;
+
+      createReceiptRecordInDb(currentSocietyId, {
+        societyId: currentSocietyId,
+        billId: payment.billId,
+        paymentId: payment.id,
+        flatId: payment.flatId || bill.flatId || '',
+        flatNumber: payment.flatNumber || bill.flat,
+        residentName: bill.residentName,
+        receiptNumber: `RCP-${payment.id.slice(-8).toUpperCase()}`,
+        billNumber: bill.billNumber,
+        billingPeriod: bill.billingPeriod || `${bill.month} ${bill.year}`,
+        amount: payment.amount || bill.totalAmount,
+        paymentMethod: payment.paymentMethod || 'UPI',
+        paymentReference: payment.paymentReference,
+        utr: payment.utr,
+        status: 'VERIFIED',
+        paidAt: payment.submittedAt || (bill as any).paidAt || '',
+        verifiedAt: payment.verifiedAt || '',
+        verifiedBy: payment.verifiedBy || '',
+        createdAt: payment.verifiedAt || payment.submittedAt || new Date().toISOString(),
+      }).catch(() => {});
+    }
+  }, [currentSocietyId, bills, payments, receipts, user]);
 
   // -------------------------------------------------------------
   // 2b. ROLE DERIVATION (membership is authoritative)
@@ -1759,8 +1802,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         amount: paidBill.totalAmount,
         paymentMethod: method,
         paymentReference: paidBill.billNumber,
-        status: 'CONFIRMED',
+        status: 'VERIFIED',
         paidAt: new Date().toISOString(),
+        verifiedAt: new Date().toISOString(),
         verifiedBy: user?.uid || 'admin',
         createdAt: new Date().toISOString(),
       }).catch((err) => console.warn('Receipt creation error:', err));
