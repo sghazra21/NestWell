@@ -36,6 +36,7 @@ import {
   ExpenseRecord,
   ExpenseCategory,
   TreasuryTransaction,
+  Receipt,
 } from '../types';
 import {
   auth,
@@ -109,6 +110,8 @@ import {
   createExpenseRecord as createExpenseRecordInDb,
   cancelExpenseRecord as cancelExpenseRecordInDb,
   subscribeExpenseRecords,
+  createReceiptRecord as createReceiptRecordInDb,
+  subscribeResidentReceipts,
 } from '../lib/firestoreService';
 
 interface AppContextType {
@@ -296,6 +299,9 @@ interface AppContextType {
     data: Omit<ExpenseRecord, 'id' | 'societyId' | 'status' | 'createdBy' | 'createdAt'>
   ) => Promise<ExpenseRecord>;
   cancelExpense: (expenseId: string, reason: string) => Promise<void>;
+
+  // Receipts
+  receipts: Receipt[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -350,6 +356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [treasuryTransactions, setTreasuryTransactions] = useState<TreasuryTransaction[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
 
   // Resident profile for the current user, populated from society membership.
   // Empty until the user's membership and flat assignment resolve.
@@ -641,7 +648,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 2c. BACKFILL: Add flatId to existing bills missing it
   // -------------------------------------------------------------
   useEffect(() => {
-    if (bills.length > 0 && flats.length > 0 && currentSocietyId) {
+    if (bills.length > 0 && flats.length > 0 && currentSocietyId && canAccessAdminView) {
       const billsNeedingFlatId = bills.filter(b => !b.flatId && b.flat);
       for (const bill of billsNeedingFlatId) {
         const matchingFlat = flats.find(f => f.number?.trim().toUpperCase() === bill.flat?.trim().toUpperCase());
@@ -650,7 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     }
-  }, [bills, flats, currentSocietyId]);
+  }, [bills, flats, currentSocietyId, canAccessAdminView]);
 
   // -------------------------------------------------------------
   // 2b. ROLE DERIVATION (membership is authoritative)
@@ -2001,7 +2008,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...data,
       status: 'Pending Review',
     });
-    showToast('Nomination filed successfully. Under Committee Review.');
   };
 
   const updateNominationStatus = async (electionId: string, nominationId: string, status: Nomination['status']) => {
@@ -2018,7 +2024,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data: Omit<Election, 'id' | 'totalVotesCast' | 'createdAt'>
   ) => {
     await createElectionRecord(currentSocietyId, data);
-    showToast('Election cycle initialized.');
   };
 
   const updateElectionStatus = async (id: string, status: Election['status']) => {

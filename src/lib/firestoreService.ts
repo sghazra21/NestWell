@@ -42,6 +42,7 @@ import {
   AppNotification,
   ExpenseRecord,
   TreasuryTransaction,
+  Receipt,
 } from '../types';
 
 export enum OperationType {
@@ -327,6 +328,7 @@ const SOCIETY_SUBCOLLECTIONS = [
   'auditLogs',
   'notifications',
   'treasury',
+  'receipts',
 ];
 
 /**
@@ -1045,7 +1047,7 @@ export async function processServerConfirmedPayment(
       currency: 'INR',
       provider: paymentDetails.method,
       providerTransactionId: paymentDetails.transactionId,
-      status: 'confirmed',
+      status: 'VERIFIED',
       initiatedAt: new Date().toISOString(),
       confirmedAt: new Date().toISOString(),
       receiptId: `REC-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -1715,6 +1717,48 @@ export function subscribeExpenseRecords(
     (snapshot) => {
       const list: ExpenseRecord[] = [];
       snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as ExpenseRecord));
+      callback(list);
+    },
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
+  );
+}
+
+// -------------------------------------------------------------
+// 16. RECEIPTS (Tenant Subcollection)
+// -------------------------------------------------------------
+
+export async function createReceiptRecord(
+  societyId: string,
+  receipt: Omit<Receipt, 'id'>
+): Promise<Receipt> {
+  const id = `rcp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const path = `societies/${societyId}/receipts/${id}`;
+  try {
+    const record: Receipt = { ...receipt, id };
+    const clean = sanitizeFirestoreData(record);
+    await setDoc(doc(db, 'societies', societyId, 'receipts', id), clean);
+    return record;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export function subscribeResidentReceipts(
+  societyId: string,
+  flatId: string,
+  callback: (receipts: Receipt[]) => void
+): () => void {
+  const path = `societies/${societyId}/receipts`;
+  return onSnapshot(
+    query(
+      collection(db, 'societies', societyId, 'receipts'),
+      where('flatId', '==', flatId),
+      orderBy('createdAt', 'desc')
+    ),
+    (snapshot) => {
+      const list: Receipt[] = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as Receipt));
       callback(list);
     },
     (error) => logFirestoreWarning(error, OperationType.LIST, path)

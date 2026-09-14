@@ -59,8 +59,9 @@ service cloud.firestore {
     }
 
     function isSocietyAdmin(societyId) {
-      return isSocietyMember(societyId)
-        && (societyRole(societyId) == 'society_admin' || societyRole(societyId) == 'admin');
+      return isPlatformAdmin()
+        || (isSocietyMember(societyId)
+          && (societyRole(societyId) == 'society_admin' || societyRole(societyId) == 'admin'));
     }
 
     function isSecurityGuard(societyId) {
@@ -245,6 +246,12 @@ service cloud.firestore {
         allow create: if isSocietyAdmin(societyId);
         allow update: if isSocietyAdmin(societyId);  // for cancellation
         allow delete: if false;
+      }
+
+      match /receipts/{receiptId} {
+        allow read: if isSocietyMember(societyId);
+        allow create: if isSocietyAdmin(societyId);
+        allow update, delete: if false;
       }
     }
 
