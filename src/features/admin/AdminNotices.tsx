@@ -2,8 +2,9 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { NoticePriority, Notice } from '../../types';
 import { uploadNoticeAttachment } from '../../lib/firestoreService';
+import { openWhatsApp } from '../../lib/whatsapp';
 import { Modal } from '../../components/common/Modal';
-import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles, Loader2, X, Upload } from 'lucide-react';
+import { Bell, Plus, Calendar, AlertCircle, FileText, Send, Sparkles, Loader2, X, Upload, MessageCircle } from 'lucide-react';
 
 export const AdminNotices: React.FC = () => {
   const { notices, createNotice, userProfile, currentSociety, towers, currentSocietyId, showToast } = useApp();
@@ -145,6 +146,19 @@ export const AdminNotices: React.FC = () => {
                 <span>{n.attachmentName}</span>
               </div>
             )}
+
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  const noticeText = `📢 ${n.title}\n\n${n.message}\n\n— ${n.publishedBy}, ${currentSociety?.name || 'Society'}`;
+                  openWhatsApp('', noticeText);
+                }}
+                className="h-9 px-3 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 flex items-center gap-1.5 text-xs font-bold transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Share on WhatsApp</span>
+              </button>
+            </div>
           </div>
         ))}
       </div>

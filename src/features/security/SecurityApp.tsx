@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../../components/common/Modal';
 import { Visitor, VisitorType } from '../../types';
+import { Html5Qrcode } from 'html5-qrcode';
 import {
   Shield,
   Search,
@@ -43,9 +44,13 @@ export const SecurityApp: React.FC = () => {
   const [walkInPurpose, setWalkInPurpose] = useState('Delivery Package');
   const [walkInCompany, setWalkInCompany] = useState('');
 
-  // Scanner simulation
+  // Scanner state
   const [scannedCode, setScannedCode] = useState('');
   const [scanResult, setScanResult] = useState<Visitor | null>(null);
+  const [scannerError, setScannerError] = useState('');
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerId = 'qr-scanner-region';
 
   // Filter visitors
   const filteredVisitors = visitors.filter((v) => {
@@ -61,13 +66,69 @@ export const SecurityApp: React.FC = () => {
     return true;
   });
 
-  const handleScanSimulation = (code: string) => {
-    const found = visitors.find((v) => v.passNumber === code || v.qrCode === code);
+  const handleScanSuccess = useCallback((decodedText: string) => {
+    const found = visitors.find((v) => v.passNumber === decodedText || v.qrCode === decodedText);
     if (found) {
       setScanResult(found);
+      setScannerError('');
+      stopScanner();
     } else {
-      showToast('QR Code not found. Please register as walk-in.');
+      setScannerError('Pass not found. Please register as walk-in.');
     }
+  }, [visitors, showToast]);
+
+  const startScanner = useCallback(async () => {
+    setScannerError('');
+    setScanResult(null);
+    setIsCameraActive(true);
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    try {
+      const scanner = new Html5Qrcode(scannerContainerId);
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => handleScanSuccess(decodedText),
+        () => {}
+      );
+    } catch (err) {
+      console.error('Scanner start error:', err);
+      setScannerError('Camera access denied or not available. Use manual entry below.');
+      setIsCameraActive(false);
+    }
+  }, [handleScanSuccess]);
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch {}
+      scannerRef.current = null;
+    }
+    setIsCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.stop();
+          scannerRef.current.clear();
+        } catch {}
+      }
+    };
+  }, []);
+
+  const handleManualLookup = (code: string) => {
+    handleScanSuccess(code);
   };
 
   const handleWalkInSubmit = (e: React.FormEvent) => {
@@ -301,10 +362,13 @@ export const SecurityApp: React.FC = () => {
         </div>
       </div>
 
-      {/* Camera Barcode/QR Scanner Simulation Modal */}
+      {/* Camera Barcode/QR Scanner Modal */}
       <Modal
         isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
+        onClose={() => {
+          stopScanner();
+          setIsScannerOpen(false);
+        }}
         title={`${currentSociety?.gates?.[0]?.name || 'Security Gate'} Camera Scanner`}
         subtitle="Point tablet camera at visitor QR pass"
         maxWidth="sm"
@@ -312,29 +376,70 @@ export const SecurityApp: React.FC = () => {
         <div className="space-y-4 text-center">
           {!scanResult ? (
             <div>
-              {/* Simulated Camera Viewfinder */}
-              <div className="relative w-full h-56 bg-slate-950 rounded-2xl overflow-hidden flex flex-col items-center justify-center border-4 border-slate-700">
-                <div className="absolute inset-x-8 top-6 bottom-6 border-2 border-dashed border-indigo-400/80 rounded-xl animate-pulse" />
-                <Camera className="w-12 h-12 text-slate-500 mb-2" />
-                <span className="text-xs font-mono text-indigo-300 z-10 bg-slate-900/80 px-3 py-1 rounded">
-                  SCANNING ACTIVE...
-                </span>
+              {/* Real Camera Viewfinder */}
+              <div className="relative w-full bg-slate-950 rounded-2xl overflow-hidden border-4 border-slate-700" style={{ minHeight: '280px' }}>
+                <div id={scannerContainerId} className="w-full" style={{ minHeight: '280px' }} />
+                {!isCameraActive && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <Camera className="w-12 h-12 text-slate-500 mb-2" />
+                    <span className="text-xs font-mono text-indigo-300 z-10 bg-slate-900/80 px-3 py-1 rounded">
+                      TAP TO START CAMERA
+                    </span>
+                  </div>
+                )}
               </div>
+
+              {!isCameraActive && (
+                <button
+                  onClick={startScanner}
+                  className="mt-3 h-11 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center justify-center gap-2 mx-auto transition-colors"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Start Camera Scanner</span>
+                </button>
+              )}
+
+              {isCameraActive && (
+                <button
+                  onClick={stopScanner}
+                  className="mt-3 h-10 px-4 rounded-xl bg-red-100 text-red-700 font-bold text-xs hover:bg-red-200 transition-colors"
+                >
+                  Stop Camera
+                </button>
+              )}
+
+              {scannerError && (
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-semibold">
+                  {scannerError}
+                </div>
+              )}
 
               <div className="mt-4">
                 <p className="text-xs text-slate-500 mb-2">
-                  Select an active visitor pass to simulate camera scan:
+                  Or manually enter a pass code:
                 </p>
-                <div className="flex flex-wrap gap-1.5 justify-center">
-                  {visitors.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => handleScanSimulation(v.passNumber)}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-mono font-bold border border-slate-200 transition-colors"
-                    >
-                      {v.name} ({v.flat})
-                    </button>
-                  ))}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter pass number..."
+                    value={scannedCode}
+                    onChange={(e) => setScannedCode(e.target.value)}
+                    className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && scannedCode.trim()) {
+                        handleManualLookup(scannedCode.trim());
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (scannedCode.trim()) handleManualLookup(scannedCode.trim());
+                    }}
+                    disabled={!scannedCode.trim()}
+                    className="h-10 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 disabled:opacity-40 transition-colors"
+                  >
+                    Lookup
+                  </button>
                 </div>
               </div>
             </div>
