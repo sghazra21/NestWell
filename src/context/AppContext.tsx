@@ -602,8 +602,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Receipts (resident-scoped via flatId filter)
     let unsubReceipts: (() => void) | null = null;
-    if (residentFlatIdRef.current) {
-      unsubReceipts = subscribeResidentReceipts(currentSocietyId, residentFlatIdRef.current, (rList) => setReceipts(rList));
+    const resolvedFlatId = residentFlatIdRef.current || flats.find(f => f.number?.trim().toUpperCase() === resident.flat?.trim().toUpperCase())?.id || '';
+    if (resolvedFlatId) {
+      unsubReceipts = subscribeResidentReceipts(currentSocietyId, resolvedFlatId, (rList) => setReceipts(rList));
     }
 
     return () => {
@@ -693,18 +694,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (p) => p.status === 'VERIFIED' || (p as any).status === 'confirmed'
     );
 
-    for (const payment of verifiedPayments) {
-      const existingReceipt = receipts.find((r) => r.paymentId === payment.id);
-      if (existingReceipt) continue;
+    const myFlatId = residentFlatIdRef.current || flats.find(f => f.number?.trim().toUpperCase() === resident.flat?.trim().toUpperCase())?.id || '';
 
+    for (const payment of verifiedPayments) {
       const bill = bills.find((b) => b.id === payment.billId);
       if (!bill) continue;
+
+      const paymentFlatId = payment.flatId || bill.flatId || '';
+      if (myFlatId && paymentFlatId !== myFlatId) continue;
 
       createReceiptRecordInDb(currentSocietyId, {
         societyId: currentSocietyId,
         billId: payment.billId,
         paymentId: payment.id,
-        flatId: payment.flatId || bill.flatId || '',
+        flatId: paymentFlatId,
         flatNumber: payment.flatNumber || bill.flat,
         residentName: bill.residentName,
         receiptNumber: `RCP-${payment.id.slice(-8).toUpperCase()}`,
@@ -721,7 +724,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createdAt: payment.verifiedAt || payment.submittedAt || new Date().toISOString(),
       }).catch(() => {});
     }
-  }, [currentSocietyId, bills, payments, receipts, user]);
+  }, [currentSocietyId, bills, payments, user, resident.flat, flats]);
 
   // -------------------------------------------------------------
   // 2b. ROLE DERIVATION (membership is authoritative)

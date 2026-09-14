@@ -802,7 +802,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">Nomination Window</label>
+                    <label className="block text-slate-600 font-bold mb-1">Nominations Start</label>
                     <input
                       type="date"
                       value={scheduleForm.nominationStart}
@@ -812,11 +812,31 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">Voting Window</label>
+                    <label className="block text-slate-600 font-bold mb-1">Nominations End</label>
+                    <input
+                      type="date"
+                      value={scheduleForm.nominationEnd}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, nominationEnd: e.target.value })}
+                      className="w-full h-10 px-3 bg-white rounded-xl border border-slate-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">Voting Start</label>
                     <input
                       type="date"
                       value={scheduleForm.votingStart}
                       onChange={(e) => setScheduleForm({ ...scheduleForm, votingStart: e.target.value })}
+                      className="w-full h-10 px-3 bg-white rounded-xl border border-slate-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">Voting End</label>
+                    <input
+                      type="date"
+                      value={scheduleForm.votingEnd}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, votingEnd: e.target.value })}
                       className="w-full h-10 px-3 bg-white rounded-xl border border-slate-200"
                     />
                   </div>
