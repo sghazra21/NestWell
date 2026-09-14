@@ -843,7 +843,7 @@ export const AdminFinance: React.FC = () => {
                           </button>
                         ) : (
                           <button onClick={() => {
-                            const paymentForBill = payments.find(p => p.billId === b.id && p.status === 'VERIFIED');
+                            const paymentForBill = payments.find(p => p.billId === b.id && (p.status === 'VERIFIED' || p.status === 'confirmed'));
                             if (paymentForBill) {
                               setReceiptPayment(paymentForBill);
                               setReceiptBill(b);

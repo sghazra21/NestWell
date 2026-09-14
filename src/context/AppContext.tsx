@@ -668,7 +668,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [bills, flats, currentSocietyId, canAccessAdminView]);
 
   // -------------------------------------------------------------
-  // 2d. BACKFILL: Create receipts for all past VERIFIED payments missing one
+  // 2d. MIGRATION: Normalize old 'confirmed' payments to 'VERIFIED'
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!currentSocietyId || payments.length === 0) return;
+    if ((window as any).__paymentMigrationDone) return;
+    (window as any).__paymentMigrationDone = true;
+
+    const oldPayments = payments.filter((p) => (p as any).status === 'confirmed');
+    for (const payment of oldPayments) {
+      updatePaymentRecord(currentSocietyId, payment.id, { status: 'VERIFIED' }).catch(() => {});
+    }
+  }, [currentSocietyId, payments]);
+
+  // -------------------------------------------------------------
+  // 2e. BACKFILL: Create receipts for all past VERIFIED payments missing one
   // -------------------------------------------------------------
   useEffect(() => {
     if (!currentSocietyId || !user || bills.length === 0 || payments.length === 0) return;
