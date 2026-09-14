@@ -40,6 +40,7 @@ export const AdminLayout: React.FC = () => {
     setViewMode,
     canAccessAdminView,
     isPlatformAdmin,
+    setActiveView,
     userProfile,
     currentMembership,
     complaints,
@@ -262,6 +263,22 @@ export const AdminLayout: React.FC = () => {
               })}
             </nav>
 
+            {/* Platform Console in mobile drawer */}
+            {isPlatformAdmin && (
+              <div className="px-3 py-1">
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setActiveView('platform_admin');
+                  }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                >
+                  <LayoutDashboard className="w-5 h-5 text-slate-400" />
+                  <span>Platform Console</span>
+                </button>
+              </div>
+            )}
+
             {/* Today's visitors & Sign out */}
             <div className="p-3 border-t border-slate-100 space-y-2 bg-slate-50/50">
               <div className="px-2 py-1.5 flex items-center justify-between text-xs text-slate-600">
@@ -324,6 +341,17 @@ export const AdminLayout: React.FC = () => {
               );
             })}
           </nav>
+
+          {/* Platform Console (platform admins only) */}
+          {isPlatformAdmin && (
+            <button
+              onClick={() => setActiveView('platform_admin')}
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors mt-1"
+            >
+              <LayoutDashboard className="w-5 h-5 text-slate-400" />
+              <span>Platform Console</span>
+            </button>
+          )}
 
           {/* Resident View Card for Elevated Admins */}
           <div className="mt-3 p-3.5 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 rounded-2xl border border-indigo-100/90 shadow-2xs space-y-2">
