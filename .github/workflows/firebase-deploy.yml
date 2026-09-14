@@ -69,13 +69,13 @@ jobs:
           echo "Preparing Firebase deployment..."
           npm install -g firebase-tools
 
-          DEPLOY_TARGET="hosting,firestore:rules,storage:rules"
+          DEPLOY_TARGET="hosting,firestore:rules"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.deploy_rules }}" = "true" ]; then
-              DEPLOY_TARGET="hosting,firestore:rules,storage:rules"
+              DEPLOY_TARGET="hosting,firestore:rules"
             fi
           else
-            DEPLOY_TARGET="hosting,firestore:rules,storage:rules"
+            DEPLOY_TARGET="hosting,firestore:rules"
           fi
 
           if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then

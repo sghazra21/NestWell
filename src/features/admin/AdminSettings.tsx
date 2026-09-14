@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Building, Shield, Landmark, Users, Phone, CreditCard, Save, Check, Upload, X } from 'lucide-react';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
 
 export const AdminSettings: React.FC = () => {
   const { currentSociety, updateSocietySettings, showToast } = useApp();
@@ -42,8 +40,12 @@ export const AdminSettings: React.FC = () => {
   const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      showToast('Logo must be under 2MB');
+    if (file.size > 500 * 1024) {
+      showToast('Logo must be under 500KB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file');
       return;
     }
     setLogoFile(file);
@@ -58,36 +60,22 @@ export const AdminSettings: React.FC = () => {
   const handleUploadLogo = async () => {
     if (!logoFile || !currentSociety) return;
 
-    // Verify auth before upload
-    const currentUser = getAuth().currentUser;
-    if (!currentUser) {
-      showToast('You must be signed in to upload a logo.');
-      return;
-    }
-
     setIsUploadingLogo(true);
     try {
-      const storage = getStorage();
-      const storageRef = ref(storage, `societies/${currentSociety.id}/branding/logo`);
-      await uploadBytes(storageRef, logoFile);
-      const url = await getDownloadURL(storageRef);
-      await updateSocietySettings({ logoUrl: url });
+      // Convert to base64
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(logoFile);
+      });
+
+      // Save to Firestore society document
+      await updateSocietySettings({ logoUrl: base64 });
       setLogoFile(null);
       showToast('Logo updated successfully');
     } catch (error: any) {
-      const code = error?.code || '';
-      if (code === 'storage/unauthorized') {
-        showToast('Upload denied. Check that Storage rules are deployed (firebase deploy --only storage).');
-      } else if (code === 'storage/quota-exceeded') {
-        showToast('Storage quota exceeded. Please contact support.');
-      } else if (code === 'storage/invalid-argument') {
-        showToast('Invalid file. Please upload an image under 5MB.');
-      } else if (code === 'storage/object-not-found') {
-        showToast('Storage path not found. Verify the society ID is correct.');
-      } else {
-        showToast('Failed to upload logo. Please try again.');
-      }
-      console.error('Logo upload error:', error);
+      showToast('Failed to save logo: ' + (error.message || 'Unknown error'));
     } finally {
       setIsUploadingLogo(false);
     }
@@ -256,7 +244,7 @@ export const AdminSettings: React.FC = () => {
                 Upload your society logo. It will appear on payment receipts and other documents.
               </p>
               <p className="text-[11px] text-slate-400">
-                Recommended: Square image, max 2MB, PNG or JPG
+                Recommended: Square image, max 500KB, PNG or JPG
               </p>
               <div className="flex items-center gap-2">
                 <label className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors">
