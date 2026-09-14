@@ -142,6 +142,13 @@ export interface ComplaintTimelineEvent {
   done: boolean;
 }
 
+export interface ComplaintTimelineEntry {
+  action: string;
+  by: string;
+  at: string;
+  notes?: string;
+}
+
 export interface Complaint {
   id: string;
   societyId?: string;
@@ -164,6 +171,9 @@ export interface Complaint {
   photoUrl?: string;
   timeline: ComplaintTimelineEvent[];
   comments: { author: string; role: string; time: string; text: string }[];
+  resolutionNotes?: string;
+  internalNotes?: string;
+  statusHistory?: ComplaintTimelineEntry[];
 }
 
 export type LineItemType = 'maintenance' | 'parking' | 'late_fee' | 'water' | 'electricity' | 'other';
@@ -210,6 +220,12 @@ export interface Facility {
   icon: string;
   availableDays: string[];
   slots: { time: string; status: 'Available' | 'Booked' | 'Selected'; bookedBy?: string }[];
+  slotDuration?: 30 | 60 | 90 | 120;
+  maxBookingsPerDay?: number;
+  approvalRequired?: boolean;
+  status?: 'active' | 'maintenance' | 'archived';
+  operatingHoursOpen?: string;
+  operatingHoursClose?: string;
 }
 
 export interface FacilityBooking {

@@ -8,6 +8,7 @@ import {
   Visitor,
   Complaint,
   MaintenanceBill,
+  BillLineItem,
   Facility,
   FacilityBooking,
   Notice,
@@ -57,6 +58,8 @@ import {
   subscribeFlats,
   createFlatRecord,
   createFacilityRecord,
+  updateFacilityRecord,
+  archiveFacilityRecord,
   updateFlatRecord,
   subscribeMembers,
   createOrUpdateMemberRecord,
@@ -69,6 +72,8 @@ import {
   subscribeComplaints,
   createComplaintRecord,
   updateComplaintStatusRecord,
+  updateComplaintNotes as updateComplaintNotesInDb,
+  updateMemberRecord as updateMemberRecordInDb,
   subscribeBills,
   createBillRecord,
   processServerConfirmedPayment,
@@ -90,6 +95,7 @@ import {
   subscribePlatformAnalytics,
   subscribeSupportSessions,
   createSupportSessionRecord,
+  endSupportSessionRecord,
   sanitizeFirestoreData,
   createPaymentRecord,
   updatePaymentRecord,
@@ -126,8 +132,12 @@ interface AppContextType {
   createTower: (data: Omit<Tower, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Tower>;
   createFlat: (data: Omit<Flat, 'id' | 'societyId' | 'createdAt' | 'updatedAt'>) => Promise<Flat>;
   createFacility: (data: Omit<Facility, 'id' | 'societyId'>) => Promise<Facility>;
+  updateFacility: (facilityId: string, data: Partial<Facility>) => Promise<void>;
+  archiveFacility: (facilityId: string) => Promise<void>;
   updateFlat: (flatId: string, data: Partial<Flat>) => Promise<void>;
   startSupportSession: (societyId: string, reason: string) => Promise<void>;
+  endSupportSession: () => Promise<void>;
+  activeSupportSession: SupportSession | null;
   supportSessions: SupportSession[];
   platformAnalytics: PlatformAnalytics[];
   auditLogs: AuditLog[];
@@ -188,6 +198,10 @@ interface AppContextType {
   updateComplaintStatus: (id: string, status: ComplaintStatus) => void;
   assignComplaint: (id: string, name: string, role: string, phone: string) => void;
   addComplaintComment: (id: string, text: string) => void;
+  updateComplaintNotes: (id: string, data: { resolutionNotes?: string; internalNotes?: string }) => void;
+  updateResident: (uid: string, data: { name?: string; phone?: string; type?: 'Owner' | 'Tenant' }) => Promise<void>;
+  deactivateResident: (uid: string) => Promise<void>;
+  reassignResidentFlat: (uid: string, newFlatId: string, newFlatNumber: string, newTowerName: string) => Promise<void>;
   bills: MaintenanceBill[];
   createBill: (
     flatId: string,
@@ -200,6 +214,14 @@ interface AppContextType {
     dueDate: string,
     lineItems?: MaintenanceBill['lineItems']
   ) => Promise<string>;
+  generateBulkBills: (
+    billingPeriod: string,
+    month: string,
+    year: number,
+    dueDate: string,
+    lineItems: BillLineItem[],
+    scope: { towers?: string[]; occupantFilter?: 'all' | 'owner' | 'tenant' }
+  ) => Promise<{ created: number; skipped: number; failed: number }>;
   payMaintenanceBill: (billId: string, paymentMethod: string) => { receiptNumber: string; transactionId: string };
   markBillPaidManually: (billId: string, method: string) => Promise<void>;
   payments: PaymentRecord[];
@@ -289,6 +311,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [members, setMembers] = useState<SocietyMember[]>([]);
   const [currentMembership, setCurrentMembership] = useState<SocietyMember | null>(null);
   const [supportSessions, setSupportSessions] = useState<SupportSession[]>([]);
+  const [activeSupportSession, setActiveSupportSession] = useState<SupportSession | null>(null);
   const [platformAnalytics, setPlatformAnalytics] = useState<PlatformAnalytics[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
@@ -857,13 +880,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return createFacilityRecord(currentSocietyId, data);
   };
 
+  const updateFacility = async (facilityId: string, data: Partial<Facility>) => {
+    await updateFacilityRecord(currentSocietyId, facilityId, data);
+    showToast('Facility updated.');
+  };
+
+  const archiveFacility = async (facilityId: string) => {
+    await archiveFacilityRecord(currentSocietyId, facilityId);
+    showToast('Facility archived.');
+  };
+
   const updateFlat = async (flatId: string, data: Partial<Flat>) => {
     await updateFlatRecord(currentSocietyId, flatId, data);
   };
 
   const startSupportSession = async (socId: string, reason: string) => {
     if (!user?.uid || !user?.email) return;
-    await createSupportSessionRecord({
+    const session = await createSupportSessionRecord({
       platformAdminId: user.uid,
       platformAdminEmail: user.email,
       societyId: socId,
@@ -881,6 +914,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetId: socId,
       reason,
     });
+
+    setActiveSupportSession(session);
+  };
+
+  const endSupportSession = async () => {
+    if (!activeSupportSession) return;
+    try {
+      await endSupportSessionRecord(activeSupportSession.id);
+      await recordAuditLog(activeSupportSession.societyId, {
+        actorId: user?.uid || 'platform-admin',
+        actorName: userProfile?.name || 'Platform Super Admin',
+        actorRole: 'platform_admin',
+        action: 'END_SUPPORT_SESSION',
+        targetType: 'SupportSession',
+        targetId: activeSupportSession.societyId,
+        reason: `Support session ended for ${activeSupportSession.societyName}`,
+      });
+      setActiveSupportSession(null);
+      setCurrentSocietyIdState('');
+      localStorage.removeItem('nestwell_current_society_id');
+      setActiveView('platform_admin');
+      showToast('Support session ended. Returned to Platform Console.');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to end support session.');
+    }
   };
 
   // Promote a member or resident
@@ -1352,6 +1411,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Comment posted.');
   };
 
+  const updateComplaintNotes = (id: string, data: { resolutionNotes?: string; internalNotes?: string }) => {
+    const comp = complaints.find((c) => c.id === id);
+    if (!comp) return;
+    setComplaints((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...data } : c))
+    );
+    updateComplaintNotesInDb(currentSocietyId, id, data).catch((err) =>
+      console.warn('Firestore complaint notes error:', err)
+    );
+    showToast('Notes saved.');
+  };
+
+  const updateResident = async (uid: string, data: { name?: string; phone?: string; type?: 'Owner' | 'Tenant' }) => {
+    await updateMemberRecordInDb(currentSocietyId, uid, data);
+    setResidents((prev) =>
+      prev.map((r) => (r.id === uid ? { ...r, ...data } : r))
+    );
+    showToast('Resident updated.');
+  };
+
+  const deactivateResident = async (uid: string) => {
+    await updateMemberStatusInDb(currentSocietyId, uid, 'removed');
+    setResidents((prev) =>
+      prev.map((r) => (r.id === uid ? { ...r, status: 'Pending Verification' as const } : r))
+    );
+    showToast('Resident deactivated.');
+  };
+
+  const reassignResidentFlat = async (uid: string, newFlatId: string, newFlatNumber: string, newTowerName: string) => {
+    const member = members.find((m) => m.uid === uid);
+    const oldFlatId = member?.flatId;
+    const oldFlatNumber = member?.flatNumber;
+
+    await updateMemberRecordInDb(currentSocietyId, uid, {
+      flatId: newFlatId,
+      flatNumber: newFlatNumber,
+      towerName: newTowerName,
+    });
+
+    if (oldFlatId) {
+      await updateFlatRecord(currentSocietyId, oldFlatId, { status: 'vacant' }).catch(() => {});
+    }
+    await updateFlatRecord(currentSocietyId, newFlatId, { status: 'active' }).catch(() => {});
+
+    setResidents((prev) =>
+      prev.map((r) =>
+        r.id === uid ? { ...r, flat: newFlatNumber, flatId: newFlatId, tower: newTowerName } : r
+      )
+    );
+
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'system',
+      actorName: resident.name,
+      actorRole: role === 'admin' ? 'society_admin' : 'resident',
+      action: 'FLAT_REASSIGNMENT',
+      targetType: 'SocietyMember',
+      targetId: uid,
+      reason: `Flat reassigned from ${oldFlatNumber || 'N/A'} to ${newFlatNumber}`,
+    });
+
+    showToast(`Resident reassigned to Flat ${newFlatNumber}.`);
+  };
+
   // Payment Operations (Server-confirmed simulation)
   // Resident-initiated payment: attempts server confirmation first.
   // Until the Phase 12 payment backend exists, resident bill writes are
@@ -1618,6 +1740,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBill.id;
   };
 
+  // Bulk Bill Generation
+  const generateBulkBills = async (
+    billingPeriod: string,
+    month: string,
+    year: number,
+    dueDate: string,
+    lineItems: BillLineItem[],
+    scope: { towers?: string[]; occupantFilter?: 'all' | 'owner' | 'tenant' }
+  ): Promise<{ created: number; skipped: number; failed: number }> => {
+    const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
+
+    // 1. Get all flats matching scope
+    let targetFlats = flats.filter((f) => f.status === 'active');
+    if (scope.towers && scope.towers.length > 0) {
+      targetFlats = targetFlats.filter((f) => scope.towers!.includes(f.towerName || f.towerId));
+    }
+    if (scope.occupantFilter === 'owner') {
+      targetFlats = targetFlats.filter((f) => f.ownerIds && f.ownerIds.length > 0);
+    } else if (scope.occupantFilter === 'tenant') {
+      targetFlats = targetFlats.filter((f) => f.tenantIds && f.tenantIds.length > 0);
+    }
+
+    let created = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    // 2. For each flat, check duplicate then create
+    for (const flat of targetFlats) {
+      // Duplicate check: same billingPeriod + flat number
+      const exists = bills.some(
+        (b) => b.billingPeriod === billingPeriod && b.flat === flat.number
+      );
+      if (exists) {
+        skipped++;
+        continue;
+      }
+
+      const member = members.find(
+        (m) => m.flatId === flat.id || m.flatNumber === flat.number
+      );
+      const residentName = member?.name || flat.primaryResidentName || 'Resident';
+
+      try {
+        await createBillRecord(currentSocietyId, {
+          societyId: currentSocietyId,
+          flatId: flat.id,
+          flat: flat.number,
+          tower: flat.towerName || flat.towerId,
+          residentName,
+          month,
+          year,
+          maintenanceFee: lineItems.find((i) => i.type === 'maintenance')?.amount ?? 0,
+          parkingFee: lineItems.find((i) => i.type === 'parking')?.amount ?? 0,
+          lateFee: 0,
+          totalAmount,
+          status: 'Pending',
+          dueDate,
+          lineItems,
+          subtotal: totalAmount,
+          billingPeriod,
+        });
+        created++;
+      } catch {
+        failed++;
+      }
+    }
+
+    if (created > 0) {
+      showToast(
+        `Created ${created} bill${created !== 1 ? 's' : ''}, skipped ${skipped} duplicate${skipped !== 1 ? 's' : ''}, ${failed} failed`
+      );
+    } else if (skipped > 0) {
+      showToast(`All ${skipped} flats already have bills for ${billingPeriod}.`);
+    } else {
+      showToast('No flats matched the selected scope.');
+    }
+
+    return { created, skipped, failed };
+  };
+
   // Facility Booking Operations
   const bookFacilitySlot = (facilityId: string, slotTime: string, date: string) => {
     const fac = facilities.find((f) => f.id === facilityId);
@@ -1806,8 +2008,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createTower,
         createFlat,
         createFacility,
+        updateFacility,
+        archiveFacility,
         updateFlat,
         startSupportSession,
+        endSupportSession,
+        activeSupportSession,
         supportSessions,
         platformAnalytics,
         auditLogs,
@@ -1850,8 +2056,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateComplaintStatus,
         assignComplaint,
         addComplaintComment,
+        updateComplaintNotes,
+        updateResident,
+        deactivateResident,
+        reassignResidentFlat,
         bills,
         createBill,
+        generateBulkBills,
         payMaintenanceBill,
         markBillPaidManually,
         payments,

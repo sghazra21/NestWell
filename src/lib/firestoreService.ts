@@ -617,6 +617,21 @@ export async function updateMemberStatus(
   }
 }
 
+export async function updateMemberRecord(
+  societyId: string,
+  uid: string,
+  data: Partial<Pick<SocietyMember, 'name' | 'phone' | 'flatId' | 'flatNumber' | 'towerName' | 'type'>>
+): Promise<void> {
+  const path = `societies/${societyId}/members/${uid}`;
+  try {
+    const clean = sanitizeFirestoreData({ ...data, updatedAt: new Date().toISOString() });
+    await updateDoc(doc(db, 'societies', societyId, 'members', uid), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
 // -------------------------------------------------------------
 // 4b. SOCIETY INVITES & JOIN WORKFLOWS
 // Invite code is the document ID (high-entropy, single-use secret).
@@ -945,6 +960,25 @@ export async function updateComplaintStatusRecord(
   }
 }
 
+export async function updateComplaintNotes(
+  societyId: string,
+  complaintId: string,
+  data: {
+    resolutionNotes?: string;
+    internalNotes?: string;
+    status?: Complaint['status'];
+    statusHistory?: Complaint['statusHistory'];
+  }
+): Promise<void> {
+  const path = `societies/${societyId}/complaints/${complaintId}`;
+  try {
+    const clean = sanitizeFirestoreData({ ...data, updatedAt: new Date().toISOString() });
+    await updateDoc(doc(db, 'societies', societyId, 'complaints', complaintId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
 // -------------------------------------------------------------
 // 7. BILLS & PAYMENTS (Tenant Subcollection)
 // -------------------------------------------------------------
@@ -1120,6 +1154,35 @@ export function subscribeFacilityBookings(societyId: string, callback: (bookings
     },
     (error) => logFirestoreWarning(error, OperationType.LIST, path)
   );
+}
+
+export async function updateFacilityRecord(
+  societyId: string,
+  facilityId: string,
+  data: Partial<Facility>
+): Promise<void> {
+  const path = `societies/${societyId}/facilities/${facilityId}`;
+  try {
+    const clean = sanitizeFirestoreData({ ...data, updatedAt: new Date().toISOString() });
+    await updateDoc(doc(db, 'societies', societyId, 'facilities', facilityId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+export async function archiveFacilityRecord(
+  societyId: string,
+  facilityId: string
+): Promise<void> {
+  const path = `societies/${societyId}/facilities/${facilityId}`;
+  try {
+    const clean = sanitizeFirestoreData({ status: 'archived', updatedAt: new Date().toISOString() });
+    await updateDoc(doc(db, 'societies', societyId, 'facilities', facilityId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
 }
 
 export async function createFacilityBookingRecord(
@@ -1421,6 +1484,19 @@ export async function createSupportSessionRecord(
     return clean;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function endSupportSessionRecord(sessionId: string): Promise<void> {
+  const path = `supportSessions/${sessionId}`;
+  try {
+    await updateDoc(doc(db, 'supportSessions', sessionId), {
+      status: 'closed',
+      endedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
     throw error;
   }
 }
