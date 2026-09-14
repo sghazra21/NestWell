@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDebounce } from '../../hooks/useDebounce';
 import { Resident, UserRole } from '../../types';
 import { Drawer } from '../../components/common/Drawer';
 import { Modal } from '../../components/common/Modal';
@@ -44,6 +45,7 @@ export const AdminPeople: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'residents' | 'app_accounts' | 'invites'>('residents');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery);
   const [typeFilter, setTypeFilter] = useState<'All' | 'Owner' | 'Tenant'>('All');
   const [towerFilter, setTowerFilter] = useState<string>('All');
 
@@ -74,10 +76,10 @@ export const AdminPeople: React.FC = () => {
 
   const filteredResidents = residents.filter((r) => {
     const matchSearch =
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.flat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.phone.includes(searchQuery) ||
-      (r.societyRole && r.societyRole.toLowerCase().includes(searchQuery.toLowerCase()));
+      r.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      r.flat.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      r.phone.includes(debouncedSearchQuery) ||
+      (r.societyRole && r.societyRole.toLowerCase().includes(debouncedSearchQuery.toLowerCase()));
 
     const matchType = typeFilter === 'All' || r.type === typeFilter;
     const matchTower = towerFilter === 'All' || r.tower === towerFilter;

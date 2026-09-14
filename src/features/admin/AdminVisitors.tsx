@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDebounce } from '../../hooks/useDebounce';
 import { Visitor } from '../../types';
 import {
   ShieldCheck,
@@ -16,13 +17,14 @@ export const AdminVisitors: React.FC = () => {
   const { visitors, updateVisitorStatus, showToast } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery);
   const [statusFilter, setStatusFilter] = useState<'all' | 'inside' | 'expected' | 'exited'>('all');
 
   const filteredVisitors = visitors.filter((v) => {
     const matchSearch =
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.flat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.passNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      v.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      v.flat.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      v.passNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 
     const matchStatus = statusFilter === 'all' || v.status === statusFilter;
     return matchSearch && matchStatus;

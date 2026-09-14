@@ -2,8 +2,12 @@ import React, { useState, Suspense, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 
 import { ResidentApp } from './features/resident/ResidentApp';
-import { SecurityApp } from './features/security/SecurityApp';
-import { AdminLayout } from './features/admin/AdminLayout';
+const SecurityApp = React.lazy(() =>
+  import('./features/security/SecurityApp').then((m) => ({ default: m.SecurityApp }))
+);
+const AdminLayout = React.lazy(() =>
+  import('./features/admin/AdminLayout').then((m) => ({ default: m.AdminLayout }))
+);
 import { AuthModal } from './components/auth/AuthModal';
 import { ProfileCompletionModal } from './components/auth/ProfileCompletionModal';
 import { LoginScreen } from './components/auth/LoginScreen';

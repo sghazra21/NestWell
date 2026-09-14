@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDebounce } from '../../hooks/useDebounce';
 import { MaintenanceBill, BillLineItem, PaymentRecord, ExpenseRecord, ExpenseCategory } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import { downloadCSV } from '../../lib/csv';
@@ -65,6 +66,7 @@ export const AdminFinance: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery);
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Overdue' | 'Due'>('all');
   const [isCreateBillOpen, setIsCreateBillOpen] = useState(false);
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
@@ -156,9 +158,9 @@ export const AdminFinance: React.FC = () => {
 
   const filteredBills = bills.filter((b) => {
     const matchSearch =
-      b.flat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.residentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.billNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      b.flat.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      b.residentName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      b.billNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
     const matchStatus = statusFilter === 'all' || b.status === statusFilter;
     return matchSearch && matchStatus;
   });

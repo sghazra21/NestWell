@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useDebounce } from '../../hooks/useDebounce';
 import { Complaint, ComplaintStatus } from '../../types';
 import { Drawer } from '../../components/common/Drawer';
 import {
@@ -32,6 +33,7 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery);
   const [statusFilter, setStatusFilter] = useState<'all' | 'reported' | 'assigned' | 'started' | 'resolved'>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -46,9 +48,9 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
 
   const filteredComplaints = complaints.filter((c) => {
     const matchSearch =
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.flat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      c.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      c.flat.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      c.ticketNumber.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 
     const matchStatus = statusFilter === 'all' || c.status === statusFilter;
     const matchCat = categoryFilter === 'all' || c.category === categoryFilter;

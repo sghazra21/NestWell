@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { Skeleton } from '../../components/common/Skeleton';
 import {
   UserPlus,
   Wrench,
@@ -33,6 +34,49 @@ export const ResidentHome: React.FC<ResidentHomeProps> = ({
   onNavigateToTab,
 }) => {
   const { resident, gateAlert, complaints, visitors, notices, elections, setIsElectionModalOpen, currentSociety, userProfile } = useApp();
+
+  if (!resident.name && !userProfile?.name) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-xl md:max-w-3xl lg:max-w-4xl mx-auto pb-24">
+        <div className="bg-indigo-700 p-6 sm:p-8 rounded-3xl mb-4 shadow-sm space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-20 bg-indigo-500/40" />
+              <Skeleton className="h-7 w-40 bg-indigo-500/40" />
+              <Skeleton className="h-3 w-32 bg-indigo-500/40" />
+            </div>
+            <Skeleton className="h-9 w-9 rounded-full bg-indigo-500/40" />
+          </div>
+          <div className="bg-white/10 p-4 rounded-2xl space-y-2">
+            <Skeleton className="h-3 w-24 bg-indigo-500/40" />
+            <Skeleton className="h-7 w-20 bg-indigo-500/40" />
+            <Skeleton className="h-3 w-32 bg-indigo-500/40" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="p-4 rounded-2xl bg-white border border-slate-100 space-y-3">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-32" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-2xl bg-white border border-slate-100 space-y-3">
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const waitingVisitorCount = visitors.filter((v) => v.flat === resident.flat && v.status === 'waiting').length;
   const openComplaintsCount = complaints.filter((c) => c.flat === resident.flat && c.status !== 'resolved').length;
