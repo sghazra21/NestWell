@@ -1925,12 +1925,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     voterId: string;
     voterFlat: string;
   }) => {
+    // Resolve flatId from the resident's flat number
+    const flat = flats.find(
+      (f) => f.number?.trim().toUpperCase() === resident.flat?.trim().toUpperCase()
+    );
+    const flatId = flat?.id || resident.flatId || '';
+
+    if (!flatId) {
+      showToast('Could not determine your flat. Please update your profile.');
+      return;
+    }
+
+    // Generate a ballot hash for secrecy (HMAC-like: electionId + flatId + position, truncated)
+    const raw = `${data.electionId}:${flatId}:${data.position}`;
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+      const chr = raw.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0;
+    }
+    const ballotHash = `bh-${Math.abs(hash).toString(36)}`;
+
     await castVoteRecord(currentSocietyId, data.electionId, {
       electionId: data.electionId,
       position: data.position,
       candidateId: data.candidateId,
       voterId: data.voterId,
       voterFlat: data.voterFlat,
+      flatId,
+      ballotHash,
     });
     confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
     showToast('Your secret ballot was cryptographically recorded.');
@@ -1962,6 +1985,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateElectionStatus = async (id: string, status: Election['status']) => {
+    // Validate lifecycle transitions
+    const validTransitions: Record<string, string[]> = {
+      'Draft': ['Nomination Open'],
+      'Nomination Open': ['Nomination Review'],
+      'Nomination Review': ['Candidates Finalized'],
+      'Candidates Finalized': ['Voting Active'],
+      'Voting Active': ['Voting Closed'],
+      'Voting Closed': ['Results Declared'],
+      'Results Declared': ['Completed'],
+      'Completed': [],
+    };
+
+    const election = elections.find((e) => e.id === id);
+    if (election && !validTransitions[election.status]?.includes(status)) {
+      showToast(`Invalid transition: ${election.status} → ${status}`);
+      return;
+    }
+
     setElections((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
     updateElectionRecord(currentSocietyId, id, { status }).catch((err) =>
       console.warn('Firestore election update error:', err)

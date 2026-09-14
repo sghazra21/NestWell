@@ -1362,19 +1362,35 @@ export function subscribeVotes(societyId: string, electionId: string, callback: 
 }
 
 export async function castVoteRecord(societyId: string, electionId: string, vote: Omit<Vote, 'id' | 'castAt'>): Promise<Vote> {
-  // Deterministic vote ID: one vote per voter per position.
-  const id = `vote-${vote.voterId}-${vote.position.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-  const path = `societies/${societyId}/elections/${electionId}/votes/${id}`;
+  // One flat = one ballot per position. Duplicate detection on flatId + position.
+  const ballotId = `ballot-${electionId}-${vote.flatId}-${vote.position.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+  const path = `societies/${societyId}/elections/${electionId}/votes/${ballotId}`;
+
+  // Check if this flat has already voted for this position
+  const existingBallot = await getDoc(doc(db, 'societies', societyId, 'elections', electionId, 'votes', ballotId));
+  if (existingBallot.exists()) {
+    throw new Error('This flat has already cast a ballot for this position.');
+  }
+
+  // Verify election is in Voting Active status
+  const electionDoc = await getDoc(doc(db, 'societies', societyId, 'elections', electionId));
+  if (electionDoc.exists()) {
+    const election = electionDoc.data() as Election;
+    if (election.status !== 'Voting Active') {
+      throw new Error('Voting is not currently open for this election.');
+    }
+  }
+
   try {
     const record: Vote = {
       ...vote,
-      id,
+      id: ballotId,
       societyId,
       electionId,
       castAt: new Date().toISOString(),
     };
     const clean = sanitizeFirestoreData(record);
-    await setDoc(doc(db, 'societies', societyId, 'elections', electionId, 'votes', id), clean);
+    await setDoc(doc(db, 'societies', societyId, 'elections', electionId, 'votes', ballotId), clean);
 
     // Increment nomination vote count
     const nomRef = doc(db, 'societies', societyId, 'elections', electionId, 'nominations', vote.candidateId);

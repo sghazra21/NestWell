@@ -270,7 +270,15 @@ export interface ActivityEvent {
 }
 
 // Society Committee, Nomination & Election Types
-export type ElectionStatus = 'Draft' | 'Nomination Open' | 'Voting Active' | 'Completed';
+export type ElectionStatus =
+  | 'Draft'
+  | 'Nomination Open'
+  | 'Nomination Review'
+  | 'Candidates Finalized'
+  | 'Voting Active'
+  | 'Voting Closed'
+  | 'Results Declared'
+  | 'Completed';
 
 export type ElectionPosition =
   | 'President'
@@ -308,6 +316,8 @@ export interface Vote {
   candidateId: string;
   voterId: string;
   voterFlat: string;
+  flatId: string;
+  ballotHash: string;
   castAt: string;
 }
 

@@ -98,12 +98,16 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
     (n) => n.position === selectedPosition && n.status === 'Approved'
   );
 
-  // Check if current user/flat has already voted for this position
+  // Check if current user's flat has already voted for this position
+  const flatIdForVote = flats.find(
+    (f) => f.number?.trim().toUpperCase() === resident.flat?.trim().toUpperCase()
+  )?.id || resident.flatId || '';
+
   const existingVoteForPosition = votes.find(
     (v) =>
       v.electionId === currentElection.id &&
       v.position === selectedPosition &&
-      (v.voterFlat === resident.flat || v.voterId === resident.id)
+      (v.flatId === flatIdForVote || v.voterFlat === resident.flat)
   );
 
   const handleCastVote = (candidate: Nomination) => {
@@ -172,7 +176,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
       nominationEnd: scheduleForm.nominationEnd,
       votingStart: scheduleForm.votingStart,
       votingEnd: scheduleForm.votingEnd,
-      status: 'Nomination Open',
+      status: 'Draft',
       eligibleVotersCount: flats.length || 0,
     });
 
@@ -301,7 +305,7 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                       (v) =>
                         v.electionId === currentElection.id &&
                         v.position === pos &&
-                        (v.voterFlat === resident.flat || v.voterId === resident.id)
+                        (v.flatId === flatIdForVote || v.voterFlat === resident.flat)
                     );
                     return (
                       <button
@@ -347,6 +351,22 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                   </span>
                 )}
               </div>
+
+              {/* Tie detection banner */}
+              {positionCandidates.length > 1 && (() => {
+                const maxVotes = Math.max(...positionCandidates.map((c) => c.voteCount || 0));
+                const tiedCandidates = positionCandidates.filter((c) => (c.voteCount || 0) === maxVotes && maxVotes > 0);
+                const isTied = tiedCandidates.length > 1;
+                if (!isTied) return null;
+                return (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="text-amber-800 font-semibold">
+                      Tie detected — requires manual resolution by the committee.
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Candidates Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -635,19 +655,29 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => updateElectionStatus(currentElection.id, 'Voting Active')}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-                  >
-                    Set Voting Active
-                  </button>
-                  <button
-                    onClick={() => updateElectionStatus(currentElection.id, 'Completed')}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
-                  >
-                    Declare Results
-                  </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(() => {
+                    const nextStatusMap: Record<string, { label: string; next: string; color: string }[]> = {
+                      'Draft': [{ label: 'Open Nominations', next: 'Nomination Open', color: 'bg-emerald-600 hover:bg-emerald-500' }],
+                      'Nomination Open': [{ label: 'Start Review', next: 'Nomination Review', color: 'bg-amber-600 hover:bg-amber-500' }],
+                      'Nomination Review': [{ label: 'Finalize Candidates', next: 'Candidates Finalized', color: 'bg-blue-600 hover:bg-blue-500' }],
+                      'Candidates Finalized': [{ label: 'Open Voting', next: 'Voting Active', color: 'bg-emerald-600 hover:bg-emerald-500' }],
+                      'Voting Active': [{ label: 'Close Voting', next: 'Voting Closed', color: 'bg-red-600 hover:bg-red-500' }],
+                      'Voting Closed': [{ label: 'Declare Results', next: 'Results Declared', color: 'bg-indigo-600 hover:bg-indigo-500' }],
+                      'Results Declared': [{ label: 'Complete Election', next: 'Completed', color: 'bg-slate-600 hover:bg-slate-500' }],
+                      'Completed': [],
+                    };
+                    const actions = nextStatusMap[currentElection.status] || [];
+                    return actions.map((a) => (
+                      <button
+                        key={a.next}
+                        onClick={() => updateElectionStatus(currentElection.id, a.next as Election['status'])}
+                        className={`px-3 py-1.5 rounded-xl text-white text-xs font-bold ${a.color}`}
+                      >
+                        {a.label}
+                      </button>
+                    ));
+                  })()}
                 </div>
               </div>
 
