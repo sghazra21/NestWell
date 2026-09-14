@@ -246,13 +246,6 @@ service cloud.firestore {
         allow update: if isSocietyAdmin(societyId);  // for cancellation
         allow delete: if false;
       }
-
-      match /treasury/{txId} {
-        allow read: if isSocietyAdmin(societyId);
-        allow create: if isSocietyAdmin(societyId);
-        allow update: if false;
-        allow delete: if false;
-      }
     }
 
     // ---------- Platform Analytics (derived, backend-written) ----------
