@@ -123,7 +123,13 @@ export const ResidentNotices: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => showToast('Attachment download coming soon')}
+                  onClick={() => {
+                    if (selectedNotice.attachmentUrl) {
+                      window.open(selectedNotice.attachmentUrl, '_blank');
+                    } else {
+                      showToast('Attachment URL not available');
+                    }
+                  }}
                   className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100"
                 >
                   Download

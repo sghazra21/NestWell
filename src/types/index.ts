@@ -254,6 +254,7 @@ export interface Notice {
   time?: string;
   priority: 'normal' | 'urgent';
   attachmentName?: string;
+  attachmentUrl?: string;
   publishedBy: string;
   createdAt: string;
   read?: boolean;

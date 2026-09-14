@@ -241,6 +241,7 @@ interface AppContextType {
     targetBlock?: string;
     priority?: Notice['priority'];
     attachmentName?: string;
+    attachmentUrl?: string;
   }) => Notice;
   activities: ActivityEvent[];
 
@@ -657,6 +658,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // It is never set manually, never read from localStorage.
   // -------------------------------------------------------------
   useEffect(() => {
+    // Platform admins without a society membership record still get admin
+    // role in the current society context (support / inspection access).
+    if (isPlatformAdmin && !currentMembership) {
+      setRoleState((prev) => (prev === 'admin' ? prev : 'admin'));
+      setUserProfile((prev) =>
+        prev && prev.role === 'admin'
+          ? prev
+          : prev
+            ? { ...prev, role: 'admin' }
+            : prev
+      );
+      return;
+    }
+
     if (currentMembership) {
       const mapped: UserRole =
         currentMembership.role === 'society_admin'
@@ -680,7 +695,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }).catch(() => {});
       }
     }
-  }, [currentMembership, user?.uid, user?.photoURL]);
+  }, [currentMembership, user?.uid, user?.photoURL, isPlatformAdmin]);
 
   // Synchronize resident profile for the authenticated user (including admins viewing as residents)
   useEffect(() => {
@@ -1868,6 +1883,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     targetBlock?: string;
     priority?: Notice['priority'];
     attachmentName?: string;
+    attachmentUrl?: string;
   }) => {
     const newNoticeData: Omit<Notice, 'id' | 'createdAt'> = {
       societyId: currentSocietyId,
@@ -1880,6 +1896,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       priority: data.priority || 'normal',
       attachmentName: data.attachmentName,
+      attachmentUrl: data.attachmentUrl,
       publishedBy: 'Managing Committee RWA',
       read: false,
     };

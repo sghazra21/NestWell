@@ -25,11 +25,12 @@ export const AdminNotices: React.FC = () => {
     if (!title || !message) return;
 
     let attachmentName: string | undefined;
+    let attachmentUrl: string | undefined;
     if (attachmentFile && currentSocietyId) {
       setUploading(true);
       try {
         const tempId = `notice-${Date.now()}`;
-        await uploadNoticeAttachment(currentSocietyId, tempId, attachmentFile);
+        attachmentUrl = await uploadNoticeAttachment(currentSocietyId, tempId, attachmentFile);
         attachmentName = attachmentFile.name;
       } catch (err) {
         console.warn('Attachment upload failed:', err);
@@ -45,6 +46,7 @@ export const AdminNotices: React.FC = () => {
       audience: audience as Notice['audience'],
       targetBlock: audience.endsWith(' Only') ? audience.replace(/ Only$/, '') : undefined,
       attachmentName,
+      attachmentUrl,
     });
 
     setIsCreateModalOpen(false);

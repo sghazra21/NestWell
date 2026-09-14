@@ -176,7 +176,7 @@ export const ResidentMore: React.FC = () => {
             ))}
             <button
               onClick={() => {
-                showToast('Family management coming soon');
+                showToast('Contact your society admin to add family members');
                 setActiveModal(null);
               }}
               className="w-full h-12 rounded-xl border border-teal-700 text-teal-700 font-bold text-sm hover:bg-teal-50"

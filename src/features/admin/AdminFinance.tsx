@@ -213,7 +213,7 @@ export const AdminFinance: React.FC = () => {
     setLineItems([{ description: 'Monthly Maintenance', amount: 4000, type: 'maintenance' }]);
   };
 
-  const handleSendBulkReminders = () => showToast('Bulk reminders feature coming soon');
+  const handleSendBulkReminders = () => showToast('Bulk reminders require a configured email/WhatsApp integration');
 
   // Bulk bill line item handlers
   const handleBulkAddLineItem = () => {

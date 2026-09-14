@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import { Visitor } from '../../types';
+import { downloadCSV } from '../../lib/csv';
 import {
   ShieldCheck,
   Search,
@@ -49,7 +50,23 @@ export const AdminVisitors: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => showToast('CSV export coming soon')}
+            onClick={() => {
+              const rows = filteredVisitors.map((v) => ({
+                Name: v.name,
+                Phone: v.phone,
+                'Pass #': v.passNumber,
+                Type: v.type,
+                Purpose: v.purpose,
+                Company: v.company || '',
+                Flat: v.flat,
+                'Expected Date': v.expectedDate,
+                'Expected Time': v.expectedTime,
+                'Entry Time': v.entryTime || '',
+                Status: v.status,
+              }));
+              downloadCSV(rows, `visitors-${new Date().toISOString().slice(0, 10)}.csv`);
+              showToast(`Exported ${rows.length} visitor records`);
+            }}
             className="h-10 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5"
           >
             <Download className="w-4 h-4 text-slate-500" />
