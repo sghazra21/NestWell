@@ -32,6 +32,9 @@ import {
   AuditLog,
   PaymentRecord,
   AppNotification,
+  ExpenseRecord,
+  ExpenseCategory,
+  TreasuryTransaction,
 } from '../types';
 import {
   auth,
@@ -95,6 +98,11 @@ import {
   subscribeNotifications,
   markNotificationRead as markNotificationReadInDb,
   markAllNotificationsRead as markAllNotificationsReadInDb,
+  createTreasuryTransaction as createTreasuryTx,
+  subscribeTreasuryTransactions,
+  createExpenseRecord as createExpenseRecordInDb,
+  cancelExpenseRecord as cancelExpenseRecordInDb,
+  subscribeExpenseRecords,
 } from '../lib/firestoreService';
 
 interface AppContextType {
@@ -250,6 +258,19 @@ interface AppContextType {
   unreadCount: number;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
+
+  // Treasury
+  treasuryTransactions: TreasuryTransaction[];
+  cashInHand: number;
+  createTreasuryTransaction: (tx: Omit<TreasuryTransaction, 'id'>) => Promise<TreasuryTransaction>;
+
+  // Expenses
+  expenses: ExpenseRecord[];
+  totalExpensesThisMonth: number;
+  createExpense: (
+    data: Omit<ExpenseRecord, 'id' | 'societyId' | 'status' | 'createdBy' | 'createdAt'>
+  ) => Promise<ExpenseRecord>;
+  cancelExpense: (expenseId: string, reason: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -300,6 +321,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [votes, setVotes] = useState<Vote[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [treasuryTransactions, setTreasuryTransactions] = useState<TreasuryTransaction[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
 
   // Resident profile for the current user, populated from society membership.
   // Empty until the user's membership and flat assignment resolve.
@@ -542,6 +565,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Audit logs
     const unsubAudit = subscribeAuditLogs(currentSocietyId, (logs) => setAuditLogs(logs));
 
+    // Treasury
+    const unsubTreasury = subscribeTreasuryTransactions(currentSocietyId, (txList) => setTreasuryTransactions(txList));
+
+    // Expenses
+    const unsubExpenses = subscribeExpenseRecords(currentSocietyId, (expList) => setExpenses(expList));
+
     return () => {
       unsubSoc();
       unsubTowers();
@@ -559,6 +588,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubPayments();
       unsubNotifications();
       unsubAudit();
+      unsubTreasury();
+      unsubExpenses();
     };
   }, [currentSocietyId, user?.uid]);
 
@@ -992,6 +1023,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const cashInHand = treasuryTransactions.reduce((sum, tx) => {
+    if (tx.type === 'CASH_IN') return sum + tx.amount;
+    if (tx.type === 'CASH_OUT') return sum - tx.amount;
+    if (tx.type === 'ADJUSTMENT') return sum + tx.amount;
+    return sum;
+  }, 0);
+
+  // Treasury Operations
+  const createTreasuryTransaction = async (tx: Omit<TreasuryTransaction, 'id'>): Promise<TreasuryTransaction> => {
+    return createTreasuryTx(currentSocietyId, tx);
+  };
+
+  // Expense Operations
+  const totalExpensesThisMonth = expenses
+    .filter((e) => {
+      if (e.status === 'CANCELLED') return false;
+      const d = new Date(e.date);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const createExpense = async (
+    data: Omit<ExpenseRecord, 'id' | 'societyId' | 'status' | 'createdBy' | 'createdAt'>
+  ): Promise<ExpenseRecord> => {
+    const record = await createExpenseRecordInDb(currentSocietyId, {
+      ...data,
+      societyId: currentSocietyId,
+      status: 'RECORDED',
+      createdBy: userProfile?.name || user?.email || 'Admin',
+      createdAt: new Date().toISOString(),
+    });
+    // Auto-create CASH_OUT treasury transaction only for cash expenses
+    if (data.paymentMethod === 'Cash') {
+      await createTreasuryTx(currentSocietyId, {
+        societyId: currentSocietyId,
+        type: 'CASH_OUT',
+        amount: data.amount,
+        category: data.category,
+        description: `${data.category} — ${data.vendor || data.description}`,
+        sourceType: 'EXPENSE',
+        expenseId: record.id,
+        createdAt: new Date().toISOString(),
+        createdBy: userProfile?.name || user?.email || 'Admin',
+      });
+    }
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'CREATE_EXPENSE',
+      targetType: 'ExpenseRecord',
+      targetId: record.id,
+      reason: `Expense recorded: ${data.category} — ₹${data.amount.toLocaleString()} to ${data.vendor}`,
+    });
+    showToast(`Expense of ₹${data.amount.toLocaleString()} recorded.`);
+    return record;
+  };
+
+  const cancelExpense = async (expenseId: string, reason: string): Promise<void> => {
+    await cancelExpenseRecordInDb(currentSocietyId, expenseId, userProfile?.name || user?.email || 'Admin', reason);
+    await recordAuditLog(currentSocietyId, {
+      actorId: user?.uid || 'admin',
+      actorName: userProfile?.name || 'Admin',
+      actorRole: role,
+      action: 'CANCEL_EXPENSE',
+      targetType: 'ExpenseRecord',
+      targetId: expenseId,
+      reason: `Expense cancelled: ${reason}`,
+    });
+    showToast('Expense cancelled.');
+  };
 
   // Visitor Operations
   const inviteVisitor = (data: {
@@ -1436,6 +1540,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       targetId: billId,
       reason: `Offline payment recorded via ${method}`,
     });
+
+    // Auto-create treasury entry for cash payments
+    if (method === 'Cash') {
+      const bill = bills.find((b) => b.id === billId);
+      if (bill) {
+        createTreasuryTx(currentSocietyId, {
+          societyId: currentSocietyId,
+          type: 'CASH_IN',
+          amount: bill.totalAmount,
+          category: 'Maintenance',
+          description: `Cash payment for ${bill.billNumber} — Flat ${bill.flat}`,
+          sourceType: 'PAYMENT',
+          paymentId: transactionId,
+          createdAt: new Date().toISOString(),
+          createdBy: user?.uid || 'admin',
+        }).catch((err) => console.warn('Treasury entry error:', err));
+      }
+    }
+
     showToast('Offline payment recorded.');
   };
 
@@ -1760,6 +1883,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unreadCount,
         markNotificationRead,
         markAllNotificationsRead,
+        treasuryTransactions,
+        cashInHand,
+        createTreasuryTransaction,
+        expenses,
+        totalExpensesThisMonth,
+        createExpense,
+        cancelExpense,
       }}
     >
       {children}

@@ -227,10 +227,30 @@ service cloud.firestore {
         allow delete: if isPlatformAdmin();
       }
 
+      match /treasury/{txId} {
+        allow read: if isSocietyAdmin(societyId);
+        allow create: if isSocietyAdmin(societyId);
+        allow update, delete: if false;  // Never delete financial records
+      }
+
       match /notifications/{notificationId} {
         allow read: if request.auth.uid == resource.data.userId;
         allow create: if isSocietyAdmin(societyId);
         allow update: if request.auth.uid == resource.data.userId;
+        allow delete: if false;
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isSocietyAdmin(societyId);
+        allow create: if isSocietyAdmin(societyId);
+        allow update: if isSocietyAdmin(societyId);  // for cancellation
+        allow delete: if false;
+      }
+
+      match /treasury/{txId} {
+        allow read: if isSocietyAdmin(societyId);
+        allow create: if isSocietyAdmin(societyId);
+        allow update: if false;
         allow delete: if false;
       }
     }

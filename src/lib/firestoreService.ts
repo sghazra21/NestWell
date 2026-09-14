@@ -40,6 +40,8 @@ import {
   UserProfile,
   PaymentRecord,
   AppNotification,
+  ExpenseRecord,
+  TreasuryTransaction,
 } from '../types';
 
 export enum OperationType {
@@ -324,6 +326,7 @@ const SOCIETY_SUBCOLLECTIONS = [
   'elections',
   'auditLogs',
   'notifications',
+  'treasury',
 ];
 
 /**
@@ -1503,7 +1506,45 @@ export async function markAllNotificationsRead(
 }
 
 // -------------------------------------------------------------
-// 14. FIREBASE STORAGE (File Uploads)
+// 14. TREASURY (Ledger-Based Society Cash Book)
+// -------------------------------------------------------------
+
+export async function createTreasuryTransaction(
+  societyId: string,
+  tx: Omit<TreasuryTransaction, 'id'>
+): Promise<TreasuryTransaction> {
+  const id = `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const path = `societies/${societyId}/treasury/${id}`;
+  try {
+    const record: TreasuryTransaction = { ...tx, id };
+    const clean = sanitizeFirestoreData(record);
+    await setDoc(doc(db, 'societies', societyId, 'treasury', id), clean);
+    return clean;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export function subscribeTreasuryTransactions(
+  societyId: string,
+  callback: (txs: TreasuryTransaction[]) => void
+): () => void {
+  const path = `societies/${societyId}/treasury`;
+  return onSnapshot(
+    collection(db, 'societies', societyId, 'treasury'),
+    (snapshot) => {
+      const list: TreasuryTransaction[] = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as TreasuryTransaction));
+      list.sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+      callback(list);
+    },
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
+  );
+}
+
+// -------------------------------------------------------------
+// 15. FIREBASE STORAGE (File Uploads)
 // -------------------------------------------------------------
 
 const storage = getStorage();
@@ -1528,4 +1569,62 @@ export async function uploadNoticeAttachment(
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);
   return getDownloadURL(storageRef);
+}
+
+// -------------------------------------------------------------
+// 15. EXPENSES (Tenant Subcollection)
+// -------------------------------------------------------------
+
+export async function createExpenseRecord(
+  societyId: string,
+  expense: Omit<ExpenseRecord, 'id'>
+): Promise<ExpenseRecord> {
+  const id = `exp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const path = `societies/${societyId}/expenses/${id}`;
+  try {
+    const record: ExpenseRecord = { ...expense, id };
+    const clean = sanitizeFirestoreData(record);
+    await setDoc(doc(db, 'societies', societyId, 'expenses', id), clean);
+    return clean;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function cancelExpenseRecord(
+  societyId: string,
+  expenseId: string,
+  cancelledBy: string,
+  reason: string
+): Promise<void> {
+  const path = `societies/${societyId}/expenses/${expenseId}`;
+  try {
+    const clean = sanitizeFirestoreData({
+      status: 'CANCELLED',
+      cancelledAt: new Date().toISOString(),
+      cancelledBy,
+      cancellationReason: reason,
+    });
+    await updateDoc(doc(db, 'societies', societyId, 'expenses', expenseId), clean);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+export function subscribeExpenseRecords(
+  societyId: string,
+  callback: (expenses: ExpenseRecord[]) => void
+): () => void {
+  const path = `societies/${societyId}/expenses`;
+  return onSnapshot(
+    collection(db, 'societies', societyId, 'expenses'),
+    (snapshot) => {
+      const list: ExpenseRecord[] = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() } as ExpenseRecord));
+      callback(list);
+    },
+    (error) => logFirestoreWarning(error, OperationType.LIST, path)
+  );
 }

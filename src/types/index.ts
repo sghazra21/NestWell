@@ -326,3 +326,52 @@ export interface CommitteeMember {
   avatar?: string;
   responsibilities: string[];
 }
+
+// Expense types (Phase 30E)
+export type ExpenseStatus = 'RECORDED' | 'CANCELLED';
+
+export type ExpenseCategory =
+  | 'Maintenance' | 'Electricity' | 'Water' | 'Security'
+  | 'Cleaning' | 'Repairs' | 'Gardening' | 'Lift'
+  | 'Generator' | 'Plumbing' | 'Salaries' | 'Office'
+  | 'Events' | 'Legal' | 'Other';
+
+export interface ExpenseRecord {
+  id: string;
+  societyId: string;
+  amount: number;
+  date: string;
+  category: ExpenseCategory;
+  vendor: string;
+  description: string;
+  paymentMethod: 'Cash' | 'Cheque' | 'BankTransfer' | 'UPI';
+  referenceNumber?: string;
+  notes?: string;
+  receiptUrl?: string;
+  status: ExpenseStatus;
+  createdBy: string;
+  createdAt: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancellationReason?: string;
+}
+
+// Society Treasury (Ledger-Based)
+export type TreasuryTransactionType = 'CASH_IN' | 'CASH_OUT' | 'ADJUSTMENT';
+export type TreasurySource = 'PAYMENT' | 'EXPENSE' | 'ADJUSTMENT' | 'OPENING_BALANCE';
+
+export interface TreasuryTransaction {
+  id: string;
+  societyId: string;
+  type: TreasuryTransactionType;
+  amount: number;
+  category: string;
+  description: string;
+  sourceType: TreasurySource;
+  sourceId?: string;
+  paymentId?: string;
+  expenseId?: string;
+  createdAt: string;
+  createdBy: string;
+  notes?: string;
+}
