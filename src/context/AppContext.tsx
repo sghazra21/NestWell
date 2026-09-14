@@ -1425,17 +1425,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateResident = async (uid: string, data: { name?: string; phone?: string; type?: 'Owner' | 'Tenant' }) => {
     await updateMemberRecordInDb(currentSocietyId, uid, data);
-    setResidents((prev) =>
-      prev.map((r) => (r.id === uid ? { ...r, ...data } : r))
-    );
     showToast('Resident updated.');
   };
 
   const deactivateResident = async (uid: string) => {
     await updateMemberStatusInDb(currentSocietyId, uid, 'removed');
-    setResidents((prev) =>
-      prev.map((r) => (r.id === uid ? { ...r, status: 'Pending Verification' as const } : r))
-    );
     showToast('Resident deactivated.');
   };
 

@@ -57,9 +57,10 @@ const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
 export const AdminFinance: React.FC = () => {
   const {
     bills, flats, members, payments, createBill, markBillPaidManually,
-    verifyPayment, rejectPayment, showToast,
+    verifyPayment, rejectPayment, showToast, towers,
     expenses, treasuryTransactions, cashInHand,
     createExpense, cancelExpense, totalExpensesThisMonth,
+    generateBulkBills,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
@@ -88,6 +89,25 @@ export const AdminFinance: React.FC = () => {
   const [lineItems, setLineItems] = useState<BillLineItem[]>([
     { description: 'Monthly Maintenance', amount: 4000, type: 'maintenance' },
   ]);
+
+  // Bulk bill generation state
+  const [isBulkBillOpen, setIsBulkBillOpen] = useState(false);
+  const [bulkBillMonth, setBulkBillMonth] = useState(() => {
+    const d = new Date();
+    return d.toLocaleString('en-US', { month: 'long' });
+  });
+  const [bulkBillYear, setBulkBillYear] = useState(new Date().getFullYear());
+  const [bulkBillDueDate, setBulkBillDueDate] = useState(() => {
+    const d = new Date();
+    d.setDate(15);
+    return d.toISOString().split('T')[0];
+  });
+  const [bulkLineItems, setBulkLineItems] = useState<BillLineItem[]>([
+    { description: 'Monthly Maintenance', amount: 4000, type: 'maintenance' },
+  ]);
+  const [bulkTowerFilter, setBulkTowerFilter] = useState<string>('all');
+  const [bulkOccupantFilter, setBulkOccupantFilter] = useState<'all' | 'owner' | 'tenant'>('all');
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
 
   // Expense form state
   const [isRecordExpenseOpen, setIsRecordExpenseOpen] = useState(false);
@@ -186,6 +206,60 @@ export const AdminFinance: React.FC = () => {
   };
 
   const handleSendBulkReminders = () => showToast('Bulk reminders feature coming soon');
+
+  // Bulk bill line item handlers
+  const handleBulkAddLineItem = () => {
+    setBulkLineItems([...bulkLineItems, { description: '', amount: 0, type: 'other' }]);
+  };
+  const handleBulkRemoveLineItem = (index: number) => {
+    setBulkLineItems(bulkLineItems.filter((_, i) => i !== index));
+  };
+  const handleBulkLineItemChange = (index: number, field: keyof BillLineItem, value: string | number) => {
+    setBulkLineItems(bulkLineItems.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  const bulkSubtotal = bulkLineItems.reduce((sum, item) => sum + item.amount, 0);
+
+  // Preview: how many flats will be billed
+  const bulkPreviewFlats = useMemo(() => {
+    let targetFlats = flats.filter((f) => f.status === 'active');
+    if (bulkTowerFilter !== 'all') {
+      targetFlats = targetFlats.filter((f) => f.towerName === bulkTowerFilter || f.towerId === bulkTowerFilter);
+    }
+    if (bulkOccupantFilter === 'owner') {
+      targetFlats = targetFlats.filter((f) => f.ownerIds && f.ownerIds.length > 0);
+    } else if (bulkOccupantFilter === 'tenant') {
+      targetFlats = targetFlats.filter((f) => f.tenantIds && f.tenantIds.length > 0);
+    }
+    return targetFlats;
+  }, [flats, bulkTowerFilter, bulkOccupantFilter]);
+
+  const bulkBillingPeriod = `${bulkBillMonth} ${bulkBillYear}`;
+  const bulkPreviewCount = bulkPreviewFlats.filter(
+    (f) => !bills.some((b) => b.billingPeriod === bulkBillingPeriod && b.flat === f.number)
+  ).length;
+  const bulkDuplicateCount = bulkPreviewFlats.length - bulkPreviewCount;
+
+  const handleBulkGenerate = async () => {
+    if (bulkLineItems.length === 0 || bulkLineItems.every((i) => i.amount === 0)) {
+      showToast('Add at least one line item with a non-zero amount');
+      return;
+    }
+    if (bulkPreviewCount === 0) {
+      showToast('No new flats to bill — all already have bills for this period.');
+      return;
+    }
+    setIsBulkGenerating(true);
+    try {
+      const scope: { towers?: string[]; occupantFilter?: 'all' | 'owner' | 'tenant' } = {};
+      if (bulkTowerFilter !== 'all') scope.towers = [bulkTowerFilter];
+      scope.occupantFilter = bulkOccupantFilter;
+      await generateBulkBills(bulkBillingPeriod, bulkBillMonth, bulkBillYear, bulkBillDueDate, bulkLineItems, scope);
+      setIsBulkBillOpen(false);
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  };
 
   const handleOpenRecordPayment = (bill: MaintenanceBill) => {
     setSelectedBill(bill); setPaymentMethod('Cash'); setPaymentReference(''); setIsRecordPaymentOpen(true);
@@ -309,13 +383,22 @@ export const AdminFinance: React.FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {activeTab === 'bills' && (
-            <button
-              onClick={() => setIsCreateBillOpen(!isCreateBillOpen)}
-              className="h-10 px-4 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Bill</span>
-            </button>
+            <>
+              <button
+                onClick={() => setIsBulkBillOpen(true)}
+                className="h-10 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Generate Monthly Bills</span>
+              </button>
+              <button
+                onClick={() => setIsCreateBillOpen(!isCreateBillOpen)}
+                className="h-10 px-4 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create Bill</span>
+              </button>
+            </>
           )}
           {activeTab === 'expenses' && (
             <button
@@ -1215,6 +1298,144 @@ export const AdminFinance: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Generate Monthly Bills Modal */}
+      <Modal isOpen={isBulkBillOpen} onClose={() => setIsBulkBillOpen(false)}
+        title="Generate Monthly Bills"
+        subtitle={`Bulk create bills for ${bulkBillingPeriod}`}
+        maxWidth="md">
+        <div className="space-y-5">
+          {/* Billing Period */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Month</label>
+              <select value={bulkBillMonth} onChange={(e) => setBulkBillMonth(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Year</label>
+              <select value={bulkBillYear} onChange={(e) => setBulkBillYear(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                {[new Date().getFullYear(), new Date().getFullYear() + 1].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Due Date</label>
+              <input type="date" value={bulkBillDueDate} onChange={(e) => setBulkBillDueDate(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800" />
+            </div>
+          </div>
+
+          {/* Line Items */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-bold text-slate-600 uppercase">Standard Charges</label>
+              <button onClick={handleBulkAddLineItem}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                <Plus className="w-3 h-3" /> Add Item
+              </button>
+            </div>
+            <div className="space-y-2">
+              {bulkLineItems.map((item, index) => (
+                <div key={index} className="flex gap-2 items-center">
+                  <select value={item.type} onChange={(e) => handleBulkLineItemChange(index, 'type', e.target.value)}
+                    className="h-10 w-32 px-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-700">
+                    <option value="maintenance">Maintenance</option>
+                    <option value="parking">Parking</option>
+                    <option value="water">Water</option>
+                    <option value="electricity">Electricity</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input type="text" value={item.description}
+                    onChange={(e) => handleBulkLineItemChange(index, 'description', e.target.value)}
+                    placeholder="Description"
+                    className="flex-1 h-10 px-3 rounded-lg border border-slate-200 text-xs font-medium text-slate-800" />
+                  <input type="number" value={item.amount || ''}
+                    onChange={(e) => handleBulkLineItemChange(index, 'amount', Number(e.target.value))}
+                    placeholder="₹0"
+                    className="h-10 w-28 px-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-800" />
+                  {bulkLineItems.length > 1 && (
+                    <button onClick={() => handleBulkRemoveLineItem(index)}
+                      className="h-10 w-10 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex justify-end text-xs">
+              <span className="text-slate-500">Per-flat total:</span>
+              <span className="font-extrabold text-indigo-700 ml-2">₹{bulkSubtotal.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Scope */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Tower</label>
+              <select value={bulkTowerFilter} onChange={(e) => setBulkTowerFilter(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                <option value="all">All Towers</option>
+                {towers.map((t) => (
+                  <option key={t.id} value={t.name}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Occupant Type</label>
+              <select value={bulkOccupantFilter} onChange={(e) => setBulkOccupantFilter(e.target.value as 'all' | 'owner' | 'tenant')}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800">
+                <option value="all">All Flats</option>
+                <option value="owner">Owner-occupied Only</option>
+                <option value="tenant">Tenant-occupied Only</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Flats matching scope</span>
+              <span className="font-bold text-slate-900">{bulkPreviewFlats.length}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">New bills to create</span>
+              <span className="font-extrabold text-emerald-700">{bulkPreviewCount}</span>
+            </div>
+            {bulkDuplicateCount > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Skipped (duplicate period)</span>
+                <span className="font-bold text-amber-600">{bulkDuplicateCount}</span>
+              </div>
+            )}
+            <div className="border-t border-slate-200 pt-2 flex justify-between text-xs">
+              <span className="text-slate-700 font-bold">Total to generate</span>
+              <span className="font-extrabold text-indigo-700 text-sm">
+                ₹{(bulkPreviewCount * bulkSubtotal).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button onClick={() => setIsBulkBillOpen(false)}
+              className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleBulkGenerate} disabled={isBulkGenerating || bulkPreviewCount === 0}
+              className="h-10 px-5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50">
+              <Download className="w-3.5 h-3.5" />
+              <span>{isBulkGenerating ? 'Generating...' : `Generate ${bulkPreviewCount} Bill${bulkPreviewCount !== 1 ? 's' : ''}`}</span>
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
