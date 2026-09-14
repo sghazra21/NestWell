@@ -10,20 +10,16 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  ArrowRight,
   Search,
-  Sliders,
-  ExternalLink,
   Users,
   Activity,
-  CreditCard,
-  FileText,
   Lock,
   Eye,
-  RefreshCw,
   Mail,
   Copy,
   Send,
+  Archive,
+  Filter,
 } from 'lucide-react';
 
 export const PlatformAdminDashboard: React.FC = () => {
@@ -44,6 +40,7 @@ export const PlatformAdminDashboard: React.FC = () => {
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<SocietyStatus | 'all'>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [selectedSocietyForSupport, setSelectedSocietyForSupport] = useState<Society | null>(null);
@@ -75,16 +72,18 @@ export const PlatformAdminDashboard: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredSocieties = societies.filter((s) => {
-    return (
+    const matchesSearch =
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.id.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+      s.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   const totalResidentsCount = societies.reduce((acc, s) => acc + (s.totalResidents || 0), 0);
   const totalFlatsCount = societies.reduce((acc, s) => acc + (s.totalFlats || 0), 0);
   const activeSocietiesCount = societies.filter((s) => s.status === 'active').length;
+  const suspendedSocietiesCount = societies.filter((s) => s.status === 'suspended').length;
 
   const handleCreateSociety = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,13 +251,13 @@ export const PlatformAdminDashboard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Tenants</span>
+              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Societies</span>
               <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
                 <Building2 className="w-5 h-5" />
               </div>
             </div>
             <div className="text-3xl font-black text-white mt-2">{societies.length}</div>
-            <div className="text-xs text-emerald-400 mt-1 font-medium">{activeSocietiesCount} active and operational</div>
+            <div className="text-xs text-emerald-400 mt-1 font-medium">{activeSocietiesCount} active{suspendedSocietiesCount > 0 ? ` · ${suspendedSocietiesCount} suspended` : ''}</div>
           </div>
 
           <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-5 shadow-sm">
@@ -302,15 +301,32 @@ export const PlatformAdminDashboard: React.FC = () => {
               <h2 className="text-lg font-bold text-white">Managed Society Tenants</h2>
               <p className="text-slate-400 text-xs mt-0.5">Isolated Firestore tenants with designated roles and feature flags.</p>
             </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search tenant or city..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as SocietyStatus | 'all')}
+                  className="bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 appearance-none cursor-pointer"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="onboarding">Onboarding</option>
+                  <option value="pending_admin">Pending Admin</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search tenant or city..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -322,7 +338,7 @@ export const PlatformAdminDashboard: React.FC = () => {
                   <th className="px-5 py-3.5">City & Registration</th>
                   <th className="px-5 py-3.5">Scale (Flats / Residents)</th>
                   <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Active Tenant</th>
+                  <th className="px-5 py-3.5">Created</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -347,21 +363,9 @@ export const PlatformAdminDashboard: React.FC = () => {
                         {getStatusBadge(soc.status)}
                       </td>
                       <td className="px-5 py-4">
-                        {isCurrent ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                            Current Context
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setCurrentSocietyId(soc.id);
-                              showToast(`Switched active context to ${soc.name}`);
-                            }}
-                            className="text-xs text-slate-400 hover:text-white font-semibold underline underline-offset-2"
-                          >
-                            Switch to this
-                          </button>
-                        )}
+                        <div className="text-slate-200 text-xs">
+                          {soc.createdAt ? new Date(soc.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-right space-x-2">
                         {soc.status === 'pending_admin' && (
@@ -384,15 +388,23 @@ export const PlatformAdminDashboard: React.FC = () => {
                           }}
                           className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
                         >
-                          <Eye className="w-3.5 h-3.5" /> Impersonate / Support
+                          <Eye className="w-3.5 h-3.5" /> Support
                         </button>
                         {soc.status === 'active' ? (
-                          <button
-                            onClick={() => updateSocietyStatus(soc.id, 'suspended')}
-                            className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors"
-                          >
-                            Suspend
-                          </button>
+                          <>
+                            <button
+                              onClick={() => updateSocietyStatus(soc.id, 'suspended')}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors"
+                            >
+                              Suspend
+                            </button>
+                            <button
+                              onClick={() => updateSocietyStatus(soc.id, 'archived')}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-600/40 hover:bg-slate-600/60 text-slate-300 text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                            >
+                              <Archive className="w-3 h-3" /> Archive
+                            </button>
+                          </>
                         ) : (
                           <>
                             <button

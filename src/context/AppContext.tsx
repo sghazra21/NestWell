@@ -1449,12 +1449,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     await updateFlatRecord(currentSocietyId, newFlatId, { status: 'active' }).catch(() => {});
 
-    setResidents((prev) =>
-      prev.map((r) =>
-        r.id === uid ? { ...r, flat: newFlatNumber, flatId: newFlatId, tower: newTowerName } : r
-      )
-    );
-
     await recordAuditLog(currentSocietyId, {
       actorId: user?.uid || 'system',
       actorName: resident.name,

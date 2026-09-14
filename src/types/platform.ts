@@ -35,6 +35,7 @@ export interface SupportSession {
   reason: string;
   startedAt: string;
   expiresAt: string;
+  endedAt?: string;
   status: 'active' | 'closed';
 }
 

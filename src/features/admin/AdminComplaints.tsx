@@ -23,7 +23,13 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
   selectedTicketId,
   onClearSelectedTicket,
 }) => {
-  const { complaints, updateComplaintStatus, assignComplaint } = useApp();
+  const {
+    complaints,
+    updateComplaintStatus,
+    assignComplaint,
+    updateComplaintNotes,
+    user,
+  } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'reported' | 'assigned' | 'started' | 'resolved'>('all');
@@ -53,7 +59,23 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
   const handleStatusChange = (status: ComplaintStatus) => {
     if (!inspectComplaint) return;
     updateComplaintStatus(inspectComplaint.id, status);
-    setInspectComplaint((prev) => (prev ? { ...prev, status } : null));
+
+    const timelineEntry = {
+      action: 'STATUS_CHANGE',
+      by: user?.uid || 'admin',
+      at: new Date().toISOString(),
+      notes: `Status changed to ${status}${resolutionNote ? `: ${resolutionNote}` : ''}`,
+    };
+    const updatedHistory = [...(inspectComplaint.statusHistory || []), timelineEntry];
+
+    updateComplaintNotes(inspectComplaint.id, {
+      resolutionNotes: resolutionNote || inspectComplaint.resolutionNotes,
+      internalNotes: inspectComplaint.internalNotes,
+    });
+
+    setInspectComplaint((prev) =>
+      prev ? { ...prev, status, resolutionNotes: resolutionNote || prev.resolutionNotes, statusHistory: updatedHistory } : null
+    );
     setResolutionNote('');
   };
 
@@ -362,6 +384,30 @@ export const AdminComplaints: React.FC<AdminComplaintsProps> = ({
                 className="w-full p-3 rounded-xl border border-slate-200 text-sm"
               />
             </div>
+
+            {/* Status History Timeline */}
+            {inspectComplaint.statusHistory && inspectComplaint.statusHistory.length > 0 && (
+              <div>
+                <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Status History
+                </h5>
+                <div className="space-y-2">
+                  {inspectComplaint.statusHistory.map((entry, idx) => (
+                    <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800">{entry.action}</span>
+                        <span className="text-slate-400 font-mono text-[10px]">
+                          {new Date(entry.at).toLocaleString()}
+                        </span>
+                      </div>
+                      {entry.notes && (
+                        <p className="text-slate-600 mt-1">{entry.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Drawer>

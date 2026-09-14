@@ -33,9 +33,13 @@ export const AdminPeople: React.FC = () => {
     currentSociety,
     members,
     towers,
+    flats,
     setMemberStatus,
     inviteMember,
     showToast,
+    updateResident,
+    deactivateResident,
+    reassignResidentFlat,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'residents' | 'app_accounts' | 'invites'>('residents');
@@ -45,6 +49,12 @@ export const AdminPeople: React.FC = () => {
 
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editType, setEditType] = useState<'Owner' | 'Tenant'>('Owner');
+  const [editFlatId, setEditFlatId] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // New resident form state
   const [newFlat, setNewFlat] = useState('');
@@ -130,6 +140,65 @@ export const AdminPeople: React.FC = () => {
     if (selectedResident && selectedResident.id === targetId) {
       setSelectedResident((prev) => (prev ? { ...prev, societyRole: role, designation } : null));
     }
+  };
+
+  const openEditModal = (resident: Resident) => {
+    setEditName(resident.name);
+    setEditPhone(resident.phone);
+    setEditType(resident.type);
+    setEditFlatId(resident.flatId || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditResident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedResident || !editName.trim() || !editPhone.trim()) return;
+    setIsSaving(true);
+    try {
+      if (editFlatId !== (selectedResident.flatId || '')) {
+        const newFlat = flats.find((f) => f.id === editFlatId);
+        await reassignResidentFlat(
+          selectedResident.id,
+          editFlatId,
+          newFlat?.number || selectedResident.flat,
+          newFlat?.towerName || selectedResident.tower
+        );
+      }
+      await updateResident(selectedResident.id, {
+        name: editName.trim(),
+        phone: editPhone.trim(),
+        type: editType,
+      });
+      setSelectedResident((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: editName.trim(),
+              phone: editPhone.trim(),
+              type: editType,
+              ...(editFlatId !== (prev.flatId || '')
+                ? {
+                    flatId: editFlatId,
+                    flat: flats.find((f) => f.id === editFlatId)?.number || prev.flat,
+                    tower: flats.find((f) => f.id === editFlatId)?.towerName || prev.tower,
+                  }
+                : {}),
+            }
+          : null
+      );
+      setIsEditModalOpen(false);
+    } catch {
+      showToast('Failed to update resident.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!selectedResident) return;
+    if (!confirm(`Deactivate ${selectedResident.name}? They will lose access but history is preserved.`)) return;
+    await deactivateResident(selectedResident.id);
+    setSelectedResident(null);
   };
 
   return (
@@ -716,15 +785,29 @@ export const AdminPeople: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div className="pt-4 border-t border-slate-200 flex gap-3">
+            <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => openEditModal(selectedResident)}
+                  className="flex-1 h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-2"
+                >
+                  Edit Details
+                </button>
+                <button
+                  onClick={() => {
+                    showToast(`Maintenance reminder SMS and WhatsApp sent to ${selectedResident.name}.`);
+                  }}
+                  className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Send WhatsApp Due Notice</span>
+                </button>
+              </div>
               <button
-                onClick={() => {
-                  showToast(`Maintenance reminder SMS and WhatsApp sent to ${selectedResident.name}.`);
-                }}
-                className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2"
+                onClick={handleDeactivate}
+                className="w-full h-11 border border-red-200 text-red-700 hover:bg-red-50 font-bold text-xs rounded-xl"
               >
-                <Phone className="w-4 h-4" />
-                <span>Send WhatsApp Due Notice</span>
+                Deactivate Resident
               </button>
             </div>
           </div>
@@ -842,6 +925,91 @@ export const AdminPeople: React.FC = () => {
             className="w-full h-13 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm rounded-xl mt-2"
           >
             Save & Generate Digital Key
+          </button>
+        </form>
+      </Modal>
+
+      {/* Edit Resident Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Resident Details"
+        subtitle={selectedResident ? `${selectedResident.name} — Flat ${selectedResident.flat}` : ''}
+        maxWidth="md"
+      >
+        <form onSubmit={handleEditResident} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Full Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-700"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Mobile Number *
+            </label>
+            <input
+              type="tel"
+              required
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-700"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Flat / Unit
+            </label>
+            <select
+              value={editFlatId}
+              onChange={(e) => setEditFlatId(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-teal-700 bg-white"
+            >
+              <option value="">Select flat…</option>
+              {flats.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.number} ({f.towerName || f.towerId}) — {f.status}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Occupancy Type
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['Owner', 'Tenant'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setEditType(t)}
+                  className={`h-11 rounded-xl text-xs font-bold border ${
+                    editType === t
+                      ? 'bg-teal-700 text-white border-teal-700'
+                      : 'bg-white text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="w-full h-13 bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm rounded-xl mt-2 disabled:opacity-50"
+          >
+            {isSaving ? 'Saving…' : 'Save Changes'}
           </button>
         </form>
       </Modal>

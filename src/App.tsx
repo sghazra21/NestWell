@@ -10,7 +10,7 @@ import { LoginScreen } from './components/auth/LoginScreen';
 import { SocietyPicker } from './components/auth/SocietyPicker';
 import { JoinSociety } from './components/auth/JoinSociety';
 import { SocietyOnboarding } from './features/admin/SocietyOnboarding';
-import { Wifi, Battery, Signal, CheckCircle, Info, AlertTriangle } from 'lucide-react';
+import { Wifi, Battery, Signal, CheckCircle, Info, AlertTriangle, Shield } from 'lucide-react';
 
 const SocietyElectionModal = React.lazy(() =>
   import('./features/election/SocietyElectionModal').then((m) => ({ default: m.SocietyElectionModal }))
@@ -99,6 +99,8 @@ const AppContent: React.FC = () => {
     isPaymentsResearchOpen,
     setIsPaymentsResearchOpen,
     toastMessage,
+    activeSupportSession,
+    endSupportSession,
   } = useApp();
 
   // Production Auth Gate: If no user session exists, display the official Society Login Screen
@@ -145,6 +147,21 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 selection:bg-indigo-200">
+      {activeSupportSession && (
+        <div className="bg-amber-500 text-black px-4 py-2.5 flex items-center justify-between gap-4 text-xs font-bold z-50 shadow-lg">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            <span>Support Mode — {activeSupportSession.societyName}</span>
+            <span className="text-amber-900 font-medium">· Reason: {activeSupportSession.reason}</span>
+          </div>
+          <button
+            onClick={endSupportSession}
+            className="px-3 py-1.5 rounded-lg bg-black/10 hover:bg-black/20 text-black font-bold transition-colors"
+          >
+            End Support
+          </button>
+        </div>
+      )}
       <Suspense fallback={null}>
       {activeView === 'platform_admin' ? (
         <PlatformAdminDashboard />
