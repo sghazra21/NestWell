@@ -539,17 +539,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Bills
     const unsubBills = subscribeBills(currentSocietyId, (bList) => {
       setBills(bList);
-      const myDue = bList.find((b) => {
-        const matchByFlatId = residentFlatIdRef.current && b.flatId
-          ? b.flatId === residentFlatIdRef.current
-          : b.flat?.trim().toUpperCase() === residentFlatRef.current?.trim().toUpperCase();
-        return matchByFlatId && b.status !== 'Paid';
-      });
-      if (myDue) {
-        setResident((prev) => ({ ...prev, dues: myDue.totalAmount }));
-      } else if (bList.length > 0) {
-        setResident((prev) => ({ ...prev, dues: 0 }));
-      }
     });
 
     // Facilities & Bookings
@@ -617,6 +606,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentSocietyId, user?.uid]);
 
   // -------------------------------------------------------------
+  // 2a. DUES RECALCULATION
+  // Recalculate dues when bills or resident flat changes to fix race condition
+  // where subscribeBills fires before resident.flat/flatId are populated.
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (bills.length === 0) return;
+
+    const flatId = resident.flatId;
+    const flatNumber = resident.flat;
+
+    const myDue = bills.find((b) => {
+      if (flatId && b.flatId) return b.flatId === flatId && b.status !== 'Paid';
+      return b.flat?.trim().toUpperCase() === flatNumber?.trim().toUpperCase() && b.status !== 'Paid';
+    });
+
+    if (myDue) {
+      setResident((prev) => ({ ...prev, dues: myDue.totalAmount }));
+    } else {
+      setResident((prev) => ({ ...prev, dues: 0 }));
+    }
+  }, [bills, resident.flat, resident.flatId]);
+
+  // -------------------------------------------------------------
   // 2c. BACKFILL: Add flatId to existing bills missing it
   // -------------------------------------------------------------
   useEffect(() => {
@@ -671,8 +683,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         name: currentMembership.name || user?.displayName || userProfile?.name || prev.name || 'Resident',
         email: currentMembership.email || user?.email || prev.email,
         phone: currentMembership.phone || user?.phoneNumber || prev.phone,
-        flat: currentMembership.flatNumber || prev.flat || (flats.length > 0 ? flats[0].number : 'A-101'),
-        flatId: currentMembership.flatId || prev.flatId,
+        flat: currentMembership.flatNumber || prev.flat || '',
+        flatId: currentMembership.flatId || prev.flatId || '',
         tower: currentMembership.towerName || prev.tower || (towers.length > 0 ? towers[0].name : 'Tower A'),
         type: currentMembership.type || prev.type || 'Owner',
         status: 'Active',
@@ -688,8 +700,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         name: user.displayName || user.email?.split('@')[0] || 'Resident',
         email: user.email || '',
         phone: user.phoneNumber || '',
-        flat: prev.flat || (flats.length > 0 ? flats[0].number : 'A-101'),
-        tower: prev.tower || (towers.length > 0 ? towers[0].name : 'Tower A'),
+        flat: prev.flat || '',
+        tower: prev.tower || '',
         status: 'Active',
         avatar: user.photoURL || prev.avatar,
       }));
