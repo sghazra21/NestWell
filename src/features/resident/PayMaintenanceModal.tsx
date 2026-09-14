@@ -18,6 +18,7 @@ import {
   Info,
   FileText,
 } from 'lucide-react';
+import { PaymentReceipt, PaymentReceiptData } from '../../components/finance/PaymentReceipt';
 
 interface PayMaintenanceModalProps {
   isOpen: boolean;
@@ -433,111 +434,29 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
       {/* STATE: VERIFIED — Printable Receipt */}
       {state === 'VERIFIED' && myPaymentClaim && showReceiptView && (
         <div className="space-y-4">
-          <div className="p-5 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 space-y-3 font-sans shadow-sm print:shadow-none print:border-0">
-            <div className="border-b pb-3 text-center">
-              <h5 className="font-bold text-sm text-slate-900">
-                {(currentSociety?.legalName || currentSociety?.name || 'Society').toUpperCase()}
-              </h5>
-              <p className="text-[11px] text-slate-500">
-                {currentSociety?.registeredNumber
-                  ? `Reg. No. ${currentSociety.registeredNumber} • `
-                  : ''}
-                {currentSociety?.city || ''}
-              </p>
-              <div className="mt-2 inline-block px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider text-[10px]">
-                Payment Receipt — Verified
-              </div>
-            </div>
+          <PaymentReceipt
+            data={{
+              societyName: currentSociety?.legalName || currentSociety?.name || 'Society',
+              registeredNumber: currentSociety?.registeredNumber,
+              city: currentSociety?.city,
+              residentName: resident.name,
+              flatNumber: resident.flat,
+              towerName: resident.tower,
+              billNumber: activeBill?.billNumber || '',
+              billingPeriod: activeBill?.billingPeriod || activeBill?.month || '',
+              amount: myPaymentClaim.amount,
+              paymentMethod: myPaymentClaim.paymentMethod,
+              utr: myPaymentClaim.utr,
+              status: 'Paid',
+              verifiedBy: myPaymentClaim.verifiedBy || 'Admin',
+              receiptDate: new Date(myPaymentClaim.verifiedAt || myPaymentClaim.submittedAt).toLocaleDateString(),
+            }}
+          />
 
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div>
-                <span className="text-slate-400 block">Bill Number:</span>
-                <span className="font-mono font-bold text-slate-800">{activeBill?.billNumber}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Payment Date:</span>
-                <span className="font-medium text-slate-800">
-                  {new Date(myPaymentClaim.verifiedAt || myPaymentClaim.submittedAt).toLocaleDateString()}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Resident:</span>
-                <span className="font-bold text-slate-800">{resident.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Flat / Unit:</span>
-                <span className="font-bold text-slate-800">{resident.flat}</span>
-              </div>
-            </div>
-
-            <div className="border-t border-b py-2 space-y-1 text-[11px]">
-              {activeBill?.lineItems && activeBill.lineItems.length > 0 ? (
-                activeBill.lineItems.map((item, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span>{item.description}</span>
-                    <span>₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                ))
-              ) : (
-                <>
-                  {activeBill && activeBill.maintenanceFee > 0 && (
-                    <div className="flex justify-between">
-                      <span>Monthly Maintenance</span>
-                      <span>
-                        ₹
-                        {activeBill.maintenanceFee.toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {activeBill && activeBill.parkingFee > 0 && (
-                    <div className="flex justify-between">
-                      <span>Parking</span>
-                      <span>
-                        ₹{activeBill.parkingFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  )}
-                  {activeBill && activeBill.lateFee > 0 && (
-                    <div className="flex justify-between">
-                      <span>Late Fee</span>
-                      <span>
-                        ₹{activeBill.lateFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="border-t pt-1 flex justify-between font-bold text-xs text-slate-900">
-                <span>Total Paid</span>
-                <span>
-                  ₹
-                  {myPaymentClaim.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg">
-              <span>
-                Mode: <strong>UPI</strong>
-              </span>
-              <span>
-                UTR: <strong>{myPaymentClaim.utr}</strong>
-              </span>
-            </div>
-
-            <p className="text-[10px] text-slate-400 text-center">
-              Verified by society admin on{' '}
-              {new Date(myPaymentClaim.verifiedAt || '').toLocaleString()}. No physical signature
-              required under IT Act 2000.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-2 gap-3 pt-1 print:hidden">
             <button
               onClick={() => window.print()}
-              className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors print:hidden"
+              className="h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
             >
               <Printer className="w-4 h-4" />
               <span>Print Receipt</span>

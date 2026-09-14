@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MaintenanceBill, BillLineItem, PaymentRecord } from '../../types';
 import { Modal } from '../../components/common/Modal';
+import { PaymentReceipt, PaymentReceiptData } from '../../components/finance/PaymentReceipt';
 import {
   CreditCard,
   Search,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export const AdminFinance: React.FC = () => {
-  const { bills, flats, members, payments, createBill, markBillPaidManually, verifyPayment, rejectPayment, showToast } = useApp();
+  const { bills, flats, members, payments, createBill, markBillPaidManually, verifyPayment, rejectPayment, showToast, currentSociety } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Overdue' | 'Due'>('all');
@@ -33,6 +34,8 @@ export const AdminFinance: React.FC = () => {
   const [verificationTab, setVerificationTab] = useState<'bills' | 'verifications'>('bills');
   const [rejectModalPayment, setRejectModalPayment] = useState<PaymentRecord | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [receiptBill, setReceiptBill] = useState<MaintenanceBill | null>(null);
+  const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
 
   const [selectedFlatId, setSelectedFlatId] = useState('');
   const [billMonth, setBillMonth] = useState(() => {
@@ -525,7 +528,13 @@ export const AdminFinance: React.FC = () => {
                       </button>
                     ) : (
                       <button
-                        onClick={() => showToast('Receipt view coming soon')}
+                        onClick={() => {
+                          const matchedPayment = payments.find(
+                            (p) => p.billId === b.id && p.status === 'VERIFIED'
+                          );
+                          setReceiptBill(b);
+                          setReceiptPayment(matchedPayment || null);
+                        }}
                         className="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
                       >
                         Receipt
@@ -816,6 +825,39 @@ export const AdminFinance: React.FC = () => {
               </button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* Receipt Modal */}
+      <Modal
+        isOpen={!!receiptBill}
+        onClose={() => { setReceiptBill(null); setReceiptPayment(null); }}
+        title="Payment Receipt"
+        subtitle={receiptBill ? `${receiptBill.billNumber} • Flat ${receiptBill.flat}` : ''}
+        maxWidth="md"
+      >
+        {receiptBill && (
+          <PaymentReceipt
+            data={{
+              societyName: currentSociety?.legalName || currentSociety?.name || 'Society',
+              registeredNumber: currentSociety?.registeredNumber,
+              city: currentSociety?.city,
+              residentName: receiptBill.residentName,
+              flatNumber: receiptBill.flat,
+              towerName: receiptBill.tower,
+              billNumber: receiptBill.billNumber,
+              billingPeriod: receiptBill.billingPeriod || `${receiptBill.month} ${receiptBill.year}`,
+              amount: receiptBill.totalAmount,
+              paymentMethod: receiptBill.paymentMethod || 'Manual',
+              reference: receiptPayment?.paymentReference,
+              utr: receiptPayment?.utr,
+              status: 'Paid',
+              verifiedBy: receiptPayment?.verifiedBy || 'Admin',
+              receiptDate: receiptBill.paidAt
+                ? new Date(receiptBill.paidAt).toLocaleDateString()
+                : new Date().toLocaleDateString(),
+            }}
+          />
         )}
       </Modal>
     </div>
