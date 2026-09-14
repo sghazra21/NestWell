@@ -42,6 +42,7 @@ export interface Society {
   };
   billing?: { currency: string; defaultDueDay: number };
   payment?: { upiId: string; payeeName: string };
+  logoUrl?: string;
   createdAt: string;
   createdBy: string;
   activatedAt?: string;

@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Building, Shield, Landmark, Users, Phone, CreditCard, Save, Check } from 'lucide-react';
+import { Building, Shield, Landmark, Users, Phone, CreditCard, Save, Check, Upload, X } from 'lucide-react';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export const AdminSettings: React.FC = () => {
   const { currentSociety, updateSocietySettings, showToast } = useApp();
   const [savedNotice, setSavedNotice] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(currentSociety?.logoUrl || null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const [form, setForm] = useState({
     legalName: currentSociety?.legalName || currentSociety?.name || '',
@@ -32,6 +36,55 @@ export const AdminSettings: React.FC = () => {
 
   const handleChange = (field: string, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Logo must be under 2MB');
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+  };
+
+  const handleUploadLogo = async () => {
+    if (!logoFile || !currentSociety) return;
+    setIsUploadingLogo(true);
+    try {
+      const storage = getStorage();
+      const storageRef = ref(storage, `societies/${currentSociety.id}/branding/logo`);
+      await uploadBytes(storageRef, logoFile);
+      const url = await getDownloadURL(storageRef);
+      await updateSocietySettings({ logoUrl: url });
+      setLogoFile(null);
+      showToast('Logo updated successfully');
+    } catch {
+      showToast('Failed to upload logo. Please try again.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogoFromSociety = async () => {
+    if (!currentSociety) return;
+    setIsUploadingLogo(true);
+    try {
+      await updateSocietySettings({ logoUrl: '' });
+      setLogoFile(null);
+      setLogoPreview(null);
+      showToast('Logo removed');
+    } catch {
+      showToast('Failed to remove logo');
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -147,6 +200,83 @@ export const AdminSettings: React.FC = () => {
                 placeholder="e.g. Bangalore"
                 className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Society Branding */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 text-slate-900 font-bold text-base border-b pb-3">
+            <Upload className="w-5 h-5 text-purple-600" />
+            <span>Society Branding</span>
+          </div>
+
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              {logoPreview ? (
+                <div className="relative">
+                  <img src={logoPreview} alt="Society logo" className="h-20 w-20 rounded-xl object-contain border border-slate-200" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="h-20 w-20 rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-slate-400" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 space-y-2">
+              <p className="text-xs text-slate-600 font-semibold">
+                Upload your society logo. It will appear on payment receipts and other documents.
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Recommended: Square image, max 2MB, PNG or JPG
+              </p>
+              <div className="flex items-center gap-2">
+                <label className="h-9 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{logoFile ? 'Change File' : 'Choose File'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoSelect}
+                    className="hidden"
+                  />
+                </label>
+                {logoFile && (
+                  <button
+                    type="button"
+                    onClick={handleUploadLogo}
+                    disabled={isUploadingLogo}
+                    className="h-9 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    {isUploadingLogo ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Uploading...
+                      </span>
+                    ) : (
+                      'Upload Logo'
+                    )}
+                  </button>
+                )}
+                {currentSociety?.logoUrl && !logoFile && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogoFromSociety}
+                    disabled={isUploadingLogo}
+                    className="h-9 px-4 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-red-600 text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Remove Logo
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

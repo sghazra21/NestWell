@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import { MaintenanceBill, BillLineItem, PaymentRecord, ExpenseRecord, ExpenseCategory } from '../../types';
 import { Modal } from '../../components/common/Modal';
+import { PaymentReceipt } from '../../components/finance/PaymentReceipt';
 import { downloadCSV } from '../../lib/csv';
 import {
   CreditCard,
@@ -61,7 +62,7 @@ export const AdminFinance: React.FC = () => {
     verifyPayment, rejectPayment, showToast, towers,
     expenses, treasuryTransactions, cashInHand,
     createExpense, cancelExpense, totalExpensesThisMonth,
-    generateBulkBills,
+    generateBulkBills, currentSociety,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<FinanceTab>('overview');
@@ -126,6 +127,11 @@ export const AdminFinance: React.FC = () => {
   const [expenseDateTo, setExpenseDateTo] = useState('');
   const [cancelExpenseModal, setCancelExpenseModal] = useState<ExpenseRecord | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  // Receipt modal state
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptPayment, setReceiptPayment] = useState<PaymentRecord | null>(null);
+  const [receiptBill, setReceiptBill] = useState<MaintenanceBill | null>(null);
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const totalAmount = subtotal;
@@ -836,7 +842,16 @@ export const AdminFinance: React.FC = () => {
                             Record Payment
                           </button>
                         ) : (
-                          <button onClick={() => showToast('Receipt view coming soon')}
+                          <button onClick={() => {
+                            const paymentForBill = payments.find(p => p.billId === b.id && p.status === 'VERIFIED');
+                            if (paymentForBill) {
+                              setReceiptPayment(paymentForBill);
+                              setReceiptBill(b);
+                              setShowReceiptModal(true);
+                            } else {
+                              showToast('No verified payment found for this bill');
+                            }
+                          }}
                             className="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
                             Receipt
                           </button>
@@ -1439,6 +1454,33 @@ export const AdminFinance: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Receipt Modal */}
+      {showReceiptModal && receiptPayment && receiptBill && (
+        <Modal isOpen={showReceiptModal} onClose={() => setShowReceiptModal(false)}
+          title="Payment Receipt" maxWidth="md">
+          <PaymentReceipt
+            data={{
+              societyName: currentSociety?.legalName || currentSociety?.name || '',
+              societyLogoUrl: currentSociety?.logoUrl,
+              registeredNumber: currentSociety?.registeredNumber,
+              city: currentSociety?.city,
+              residentName: receiptBill.residentName,
+              flatNumber: receiptBill.flat,
+              towerName: receiptBill.tower,
+              billNumber: receiptBill.billNumber,
+              billingPeriod: receiptBill.billingPeriod || `${receiptBill.month} ${receiptBill.year}`,
+              amount: receiptPayment.amount,
+              paymentMethod: receiptPayment.paymentMethod,
+              reference: receiptPayment.paymentReference,
+              utr: receiptPayment.utr,
+              status: receiptPayment.status,
+              receiptDate: new Date(receiptPayment.verifiedAt || receiptPayment.submittedAt).toLocaleDateString(),
+              verifiedBy: receiptPayment.verifiedBy,
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 };

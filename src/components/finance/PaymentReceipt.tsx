@@ -3,6 +3,7 @@ import { Printer } from 'lucide-react';
 
 export interface PaymentReceiptData {
   societyName: string;
+  societyLogoUrl?: string;
   registeredNumber?: string;
   city?: string;
   residentName: string;
@@ -62,9 +63,13 @@ export const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ data }) => {
         className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-md mx-auto text-xs text-slate-700 space-y-4 font-sans"
       >
         <div className="text-center border-b border-slate-200 pb-4">
-          <h5 className="font-extrabold text-base text-slate-900 tracking-tight">
-            {data.societyName.toUpperCase()}
-          </h5>
+          {data.societyLogoUrl ? (
+            <img src={data.societyLogoUrl} alt={data.societyName} className="h-12 w-auto mx-auto mb-1" />
+          ) : (
+            <h5 className="font-extrabold text-base text-slate-900 tracking-tight">
+              {data.societyName.toUpperCase()}
+            </h5>
+          )}
           {data.registeredNumber && (
             <p className="text-[11px] text-slate-500 mt-0.5">
               Reg. No. {data.registeredNumber}
@@ -157,7 +162,7 @@ export const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ data }) => {
 
         <div className="border-t border-slate-200 pt-3 text-center space-y-1">
           <p className="text-[10px] text-slate-400">
-            Received by: NestWell
+            Received by: {data.societyName}
           </p>
           <p className="text-[10px] text-slate-400">
             Generated: {new Date().toLocaleString()}

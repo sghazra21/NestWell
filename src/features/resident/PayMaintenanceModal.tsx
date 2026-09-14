@@ -437,6 +437,7 @@ export const PayMaintenanceModal: React.FC<PayMaintenanceModalProps> = ({ isOpen
           <PaymentReceipt
             data={{
               societyName: currentSociety?.legalName || currentSociety?.name || 'Society',
+              societyLogoUrl: currentSociety?.logoUrl,
               registeredNumber: currentSociety?.registeredNumber,
               city: currentSociety?.city,
               residentName: resident.name,
