@@ -354,6 +354,29 @@ export interface CommitteeMember {
   responsibilities: string[];
 }
 
+// Receipt types (Phase 32)
+export interface Receipt {
+  id: string;
+  societyId: string;
+  billId: string;
+  paymentId: string;
+  flatId: string;
+  flatNumber: string;
+  residentName: string;
+  receiptNumber: string;
+  billNumber: string;
+  billingPeriod: string;
+  amount: number;
+  paymentMethod: string;
+  paymentReference?: string;
+  utr?: string;
+  status: 'VERIFIED' | 'CONFIRMED';
+  paidAt: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  createdAt: string;
+}
+
 // Expense types (Phase 30E)
 export type ExpenseStatus = 'RECORDED' | 'CANCELLED';
 

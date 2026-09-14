@@ -6,9 +6,12 @@ service firebase.storage {
       // Any authenticated society member can read
       allow read: if request.auth != null;
       // Society members can write to their society folder
-      allow write: if request.auth != null 
+      allow write: if request.auth != null
         && request.resource.size < 5 * 1024 * 1024  // 5MB limit
         && request.resource.contentType.matches('image/.*');
     }
   }
 }
+
+// NOTE: Run `firebase deploy --only storage` after modifying this file.
+// CORS errors are typically caused by rules not being deployed.

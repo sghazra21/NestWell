@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Building, Shield, Landmark, Users, Phone, CreditCard, Save, Check, Upload, X } from 'lucide-react';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 
 export const AdminSettings: React.FC = () => {
   const { currentSociety, updateSocietySettings, showToast } = useApp();
@@ -56,6 +57,14 @@ export const AdminSettings: React.FC = () => {
 
   const handleUploadLogo = async () => {
     if (!logoFile || !currentSociety) return;
+
+    // Verify auth before upload
+    const currentUser = getAuth().currentUser;
+    if (!currentUser) {
+      showToast('You must be signed in to upload a logo.');
+      return;
+    }
+
     setIsUploadingLogo(true);
     try {
       const storage = getStorage();
@@ -65,8 +74,20 @@ export const AdminSettings: React.FC = () => {
       await updateSocietySettings({ logoUrl: url });
       setLogoFile(null);
       showToast('Logo updated successfully');
-    } catch {
-      showToast('Failed to upload logo. Please try again.');
+    } catch (error: any) {
+      const code = error?.code || '';
+      if (code === 'storage/unauthorized') {
+        showToast('Upload denied. Check that Storage rules are deployed (firebase deploy --only storage).');
+      } else if (code === 'storage/quota-exceeded') {
+        showToast('Storage quota exceeded. Please contact support.');
+      } else if (code === 'storage/invalid-argument') {
+        showToast('Invalid file. Please upload an image under 5MB.');
+      } else if (code === 'storage/object-not-found') {
+        showToast('Storage path not found. Verify the society ID is correct.');
+      } else {
+        showToast('Failed to upload logo. Please try again.');
+      }
+      console.error('Logo upload error:', error);
     } finally {
       setIsUploadingLogo(false);
     }

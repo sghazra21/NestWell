@@ -4,6 +4,7 @@ import { ResidentHome } from './ResidentHome';
 import { ResidentActivity } from './ResidentActivity';
 import { ResidentNotices } from './ResidentNotices';
 import { ResidentMore } from './ResidentMore';
+import { ResidentReceipts } from './ResidentReceipts';
 import { InviteVisitorModal } from './InviteVisitorModal';
 import { ReportProblemModal } from './ReportProblemModal';
 import { PayMaintenanceModal } from './PayMaintenanceModal';
@@ -11,11 +12,11 @@ import { BookFacilityModal } from './BookFacilityModal';
 import { GateApprovalModal } from './GateApprovalModal';
 import { NotificationBell } from '../../components/common/NotificationBell';
 import { NestWellLogo } from '../../components/branding/NestWellLogo';
-import { Home, Activity, Bell, MoreHorizontal, ShieldAlert, Shield, Building2 } from 'lucide-react';
+import { Home, Activity, Bell, MoreHorizontal, ShieldAlert, Shield, FileText } from 'lucide-react';
 
 export const ResidentApp: React.FC = () => {
   const { gateAlert, canAccessAdminView, setViewMode } = useApp();
-  const [activeTab, setActiveTab] = useState<'home' | 'activity' | 'notices' | 'more'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'activity' | 'notices' | 'receipts' | 'more'>('home');
 
   // Modal states
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -72,6 +73,7 @@ export const ResidentApp: React.FC = () => {
 
         {activeTab === 'activity' && <ResidentActivity />}
         {activeTab === 'notices' && <ResidentNotices />}
+        {activeTab === 'receipts' && <ResidentReceipts />}
         {activeTab === 'more' && <ResidentMore />}
       </main>
 
@@ -91,7 +93,7 @@ export const ResidentApp: React.FC = () => {
         aria-label="Resident mobile bottom navigation"
         className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-4px_20px_rgba(15,23,42,0.03)] pb-safe"
       >
-        <div className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
+        <div className="max-w-lg mx-auto flex items-center justify-around h-16 px-1">
           {/* Home */}
           <button
             id="tab-home"
@@ -132,6 +134,20 @@ export const ResidentApp: React.FC = () => {
               <Bell className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-bold">Notices</span>
+          </button>
+
+          {/* Receipts */}
+          <button
+            id="tab-receipts"
+            onClick={() => setActiveTab('receipts')}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-colors ${
+              activeTab === 'receipts' ? 'text-indigo-600 font-bold' : 'text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            <div className={`p-1 rounded-xl ${activeTab === 'receipts' ? 'bg-indigo-50 text-indigo-600' : ''}`}>
+              <FileText className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-bold">Receipts</span>
           </button>
 
           {/* More */}
