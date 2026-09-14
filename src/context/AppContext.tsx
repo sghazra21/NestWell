@@ -156,6 +156,8 @@ interface AppContextType {
   setIsProfileCompletionOpen: (open: boolean) => void;
   isElectionModalOpen: boolean;
   setIsElectionModalOpen: (open: boolean) => void;
+  selectedElectionId: string | null;
+  setSelectedElectionId: (id: string | null) => void;
   isPaymentsResearchOpen: boolean;
   setIsPaymentsResearchOpen: (open: boolean) => void;
   promoteToSocietyAdmin: (targetIdentifier: string, newRole: UserRole, designation?: string) => Promise<void>;
@@ -328,6 +330,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
   const [isElectionModalOpen, setIsElectionModalOpen] = useState(false);
+  const [selectedElectionId, setSelectedElectionId] = useState<string | null>(null);
   const [isPaymentsResearchOpen, setIsPaymentsResearchOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<'auto' | 'mobile_frame'>('auto');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -556,10 +559,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Clean up previous nested subscriptions
       unsubNoms?.();
       unsubVts?.();
-      if (eList.length > 0) {
-        const primaryElection = eList[0];
-        unsubNoms = subscribeNominations(currentSocietyId, primaryElection.id, (nomList) => setNominations(nomList));
-        unsubVts = subscribeVotes(currentSocietyId, primaryElection.id, (vtList) => setVotes(vtList));
+      // Determine which election to subscribe to for nominations/votes
+      const targetId =
+        selectedElectionId ||
+        eList.find((e) => e.status === 'Voting Active' || e.status === 'Nomination Open')?.id ||
+        eList[0]?.id;
+
+      if (targetId) {
+        unsubNoms = subscribeNominations(currentSocietyId, targetId, (nomList) => setNominations(nomList));
+        unsubVts = subscribeVotes(currentSocietyId, targetId, (vtList) => setVotes(vtList));
       } else {
         setNominations([]);
         setVotes([]);
@@ -603,7 +611,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubTreasury();
       unsubExpenses();
     };
-  }, [currentSocietyId, user?.uid]);
+  }, [currentSocietyId, user?.uid, selectedElectionId]);
 
   // -------------------------------------------------------------
   // 2a. DUES RECALCULATION
@@ -1967,8 +1975,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       flatId,
       ballotHash,
     });
-    confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
-    showToast('Your secret ballot was cryptographically recorded.');
   };
 
   const submitNomination = async (
@@ -1982,11 +1988,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateNominationStatus = async (electionId: string, nominationId: string, status: Nomination['status']) => {
-    setNominations((prev) => prev.map((n) => (n.id === nominationId ? { ...n, status } : n)));
-    updateNominationRecord(currentSocietyId, electionId, nominationId, { status }).catch((err) =>
-      console.warn('Firestore nomination update error:', err)
-    );
-    showToast(`Nomination status updated to ${status}.`);
+    try {
+      setNominations((prev) => prev.map((n) => (n.id === nominationId ? { ...n, status } : n)));
+      await updateNominationRecord(currentSocietyId, electionId, nominationId, { status });
+      showToast(`Nomination status updated to ${status}.`);
+    } catch (error: any) {
+      showToast('Failed to update nomination: ' + (error.message || 'Unknown error'));
+    }
   };
 
   const createElection = async (
@@ -2071,6 +2079,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsProfileCompletionOpen,
         isElectionModalOpen,
         setIsElectionModalOpen,
+        selectedElectionId,
+        setSelectedElectionId,
         isPaymentsResearchOpen,
         setIsPaymentsResearchOpen,
         promoteToSocietyAdmin,

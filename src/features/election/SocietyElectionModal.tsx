@@ -46,6 +46,8 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
     updateNominationStatus,
     createElection,
     updateElectionStatus,
+    selectedElectionId: contextSelectedElectionId,
+    setSelectedElectionId: setContextSelectedElectionId,
     showToast,
   } = useApp();
 
@@ -53,13 +55,16 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
     'ballot'
   );
 
-  // Active election selection
-  const [selectedElectionId, setSelectedElectionId] = useState<string>(
-    elections[0]?.id || 'elec-2026'
+  // Active election selection - sync with context
+  const [selectedElectionIdLocal, setSelectedElectionIdLocal] = useState<string>(
+    contextSelectedElectionId || elections[0]?.id || 'elec-2026'
   );
 
+  // Sync context election selection into local state
+  const effectiveSelectedElectionId = contextSelectedElectionId || selectedElectionIdLocal;
+
   const currentElection =
-    elections.find((e) => e.id === selectedElectionId) || elections[0];
+    elections.find((e) => e.id === effectiveSelectedElectionId) || elections[0];
 
   // Selected position for ballot view
   const [selectedPosition, setSelectedPosition] = useState<ElectionPosition>(
@@ -110,27 +115,31 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
       (v.flatId === flatIdForVote || v.voterFlat === resident.flat)
   );
 
-  const handleCastVote = (candidate: Nomination) => {
+  const handleCastVote = async (candidate: Nomination) => {
     if (existingVoteForPosition) {
       showToast('You have already cast your vote for this position.');
       return;
     }
 
-    castVote({
-      electionId: currentElection.id,
-      position: selectedPosition,
-      candidateId: candidate.id,
-      voterId: resident.id,
-      voterFlat: resident.flat,
-    });
+    try {
+      await castVote({
+        electionId: currentElection.id,
+        position: selectedPosition,
+        candidateId: candidate.id,
+        voterId: resident.id,
+        voterFlat: resident.flat,
+      });
 
-    confetti({
-      particleCount: 75,
-      spread: 60,
-      origin: { y: 0.7 },
-    });
+      confetti({
+        particleCount: 75,
+        spread: 60,
+        origin: { y: 0.7 },
+      });
 
-    showToast(`Vote cast successfully for ${candidate.candidateName} as ${selectedPosition}!`);
+      showToast(`Vote cast successfully for ${candidate.candidateName} as ${selectedPosition}!`);
+    } catch (error: any) {
+      showToast(error.message || 'Failed to submit vote. Please try again.');
+    }
   };
 
   const handleNominationSubmit = (e: React.FormEvent) => {
@@ -160,6 +169,25 @@ export const SocietyElectionModal: React.FC<SocietyElectionModalProps> = ({
 
   const handleCreateElection = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation
+    if (!scheduleForm.title.trim()) {
+      showToast('Election title is required.');
+      return;
+    }
+    if (!scheduleForm.nominationStart || !scheduleForm.nominationEnd) {
+      showToast('Nomination start and end dates are required.');
+      return;
+    }
+    if (!scheduleForm.votingStart || !scheduleForm.votingEnd) {
+      showToast('Voting start and end dates are required.');
+      return;
+    }
+    if (new Date(scheduleForm.votingStart) <= new Date(scheduleForm.nominationEnd)) {
+      showToast('Voting must start after nominations end.');
+      return;
+    }
+
     createElection({
       title: scheduleForm.title,
       term: scheduleForm.term,
